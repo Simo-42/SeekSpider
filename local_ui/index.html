@@ -466,6 +466,74 @@
       font-weight: 650;
     }
 
+    .search-activity {
+      grid-column: 1 / -1;
+      color: var(--text-secondary);
+      font-size: 0.8125rem;
+    }
+
+    .search-metrics {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 26px;
+      margin: 0;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .search-metrics[hidden] {
+      display: none;
+    }
+
+    .search-metrics dt {
+      color: var(--text-muted);
+    }
+
+    .search-metrics dd {
+      margin: 0;
+      color: var(--text-primary);
+      font-weight: 650;
+    }
+
+    .search-query {
+      margin: 8px 0 0;
+      overflow-wrap: anywhere;
+    }
+
+    .search-preview {
+      grid-column: 1 / -1;
+      border-top: 1px solid var(--border-subtle);
+      padding-top: 8px;
+      font-size: 0.8125rem;
+    }
+
+    .search-preview summary {
+      cursor: pointer;
+      width: fit-content;
+      padding: 3px 4px;
+      margin-left: -4px;
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .search-preview summary:hover {
+      color: var(--accent);
+    }
+
+    .search-preview ul {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+      gap: 6px 16px;
+      margin: 6px 0 0;
+      padding-inline-start: 1.15em;
+      color: var(--text-secondary);
+      overflow-wrap: anywhere;
+    }
+
+    .search-preview strong {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
     .search-track {
       height: 7px;
       overflow: hidden;
@@ -1469,6 +1537,27 @@
             <div class="search-fill" id="search-fill"></div>
           </div>
         </div>
+        <div class="search-activity" id="search-activity" hidden>
+          <dl class="search-metrics" id="search-metrics" aria-label="Activité de collecte">
+            <div id="search-seen-row" hidden>
+              <dt>Offres uniques vues</dt>
+              <dd id="search-seen"></dd>
+            </div>
+            <div id="search-elapsed-row" hidden>
+              <dt>Temps écoulé</dt>
+              <dd id="search-elapsed"></dd>
+            </div>
+            <div id="search-remaining-row" hidden>
+              <dt>Temps restant estimé</dt>
+              <dd id="search-remaining"></dd>
+            </div>
+          </dl>
+          <p class="search-query" id="search-query" hidden>Dernière page lue : <strong id="search-query-name"></strong></p>
+        </div>
+        <details class="search-preview" id="search-preview" open hidden>
+          <summary>Dernières offres vues</summary>
+          <ul id="search-recent-jobs"></ul>
+        </details>
       </section>
 
       <section class="progress-panel" aria-labelledby="progress-heading">
@@ -1651,6 +1740,8 @@
 
       let activeFetchPromise = null;
       let profileSignature = "";
+      let searchPreviewSignature = "";
+      let searchClock = null;
 
       const state = {
         jobs: [],
@@ -1698,6 +1789,18 @@
         searchMeterPercent: document.getElementById("search-meter-percent"),
         searchTrack: document.getElementById("search-track"),
         searchFill: document.getElementById("search-fill"),
+        searchActivity: document.getElementById("search-activity"),
+        searchMetrics: document.getElementById("search-metrics"),
+        searchSeenRow: document.getElementById("search-seen-row"),
+        searchSeen: document.getElementById("search-seen"),
+        searchElapsedRow: document.getElementById("search-elapsed-row"),
+        searchElapsed: document.getElementById("search-elapsed"),
+        searchRemainingRow: document.getElementById("search-remaining-row"),
+        searchRemaining: document.getElementById("search-remaining"),
+        searchQuery: document.getElementById("search-query"),
+        searchQueryName: document.getElementById("search-query-name"),
+        searchPreview: document.getElementById("search-preview"),
+        searchRecentJobs: document.getElementById("search-recent-jobs"),
         progressStatusPill: document.getElementById("progress-status-pill"),
         progressMessage: document.getElementById("progress-message"),
         startAnalysisBtn: document.getElementById("start-analysis-btn"),
@@ -2131,6 +2234,67 @@
         }
       }
 
+      function formatSearchDuration(seconds) {
+        const minutes = Math.floor(seconds / 60);
+        return (minutes ? minutes + " min " : "") + seconds % 60 + " s";
+      }
+
+      function renderSearchClock() {
+        const task = state.searchTask;
+        if (!task || els.searchActivity.hidden) return;
+        const running = task.status === "running";
+        const age = running && !state.lastError ? Math.floor((performance.now() - task.received_at) / 1000) : 0;
+        if (task.elapsed_seconds !== null) {
+          els.searchElapsed.textContent = formatSearchDuration(task.elapsed_seconds + age);
+        }
+        if (running) {
+          const remaining = task.remaining_seconds === null ? 0 : task.remaining_seconds - age;
+          els.searchRemaining.textContent = task.total && task.completed >= task.total
+            ? "Finalisation"
+            : remaining > 0 && !state.lastError ? "≈ " + formatSearchDuration(remaining) : "Calcul en cours";
+        }
+      }
+
+      function renderSearchActivity(task) {
+        const running = task && task.status === "running";
+        const showSeen = task && task.seen_jobs !== null;
+        const showElapsed = task && task.elapsed_seconds !== null;
+        const showEstimate = running && (showElapsed || showSeen || task.remaining_seconds !== null);
+        const showMetrics = showSeen || showElapsed || showEstimate;
+        els.searchActivity.hidden = !showMetrics && !(task && task.last_query);
+        els.searchMetrics.hidden = !showMetrics;
+        els.searchSeenRow.hidden = !showSeen;
+        els.searchElapsedRow.hidden = !showElapsed;
+        els.searchRemainingRow.hidden = !showEstimate;
+        if (showSeen) els.searchSeen.textContent = task.seen_jobs.toLocaleString("fr-FR");
+        els.searchQuery.hidden = !(task && task.last_query);
+        if (!els.searchQuery.hidden) els.searchQueryName.textContent = task.last_query;
+        renderSearchClock();
+
+        if (running && showMetrics && searchClock === null) {
+          searchClock = window.setInterval(renderSearchClock, 1000);
+        } else if ((!running || !showMetrics) && searchClock !== null) {
+          window.clearInterval(searchClock);
+          searchClock = null;
+        }
+
+        const recent = task ? task.recent_jobs : [];
+        els.searchPreview.hidden = recent.length === 0;
+        const signature = JSON.stringify(recent);
+        if (signature === searchPreviewSignature) return;
+        searchPreviewSignature = signature;
+        els.searchRecentJobs.replaceChildren();
+        for (const job of recent) {
+          const item = document.createElement("li");
+          const title = document.createElement("strong");
+          title.textContent = job.job_title;
+          item.appendChild(title);
+          const context = [job.business_name, job.area].filter(Boolean).join(" · ");
+          if (context) item.append(" — " + context);
+          els.searchRecentJobs.appendChild(item);
+        }
+      }
+
       function renderSearchTask() {
         const task = state.searchTask;
         const running = task && task.status === "running";
@@ -2167,12 +2331,12 @@
         els.searchMeter.hidden = !showMeter;
         els.searchTrack.classList.toggle("is-indeterminate", showMeter && total === 0);
         els.searchFill.style.width = total ? percent + "%" : "";
-        els.searchMeterCount.textContent = total ? completed + " / " + total + " recherches" : "Démarrage…";
+        els.searchMeterCount.textContent = total ? completed + " / " + total + " pages lues" : "Démarrage…";
         els.searchMeterPercent.textContent = total ? percent + " %" : "";
         if (total) {
           els.searchTrack.setAttribute("aria-valuemax", String(total));
           els.searchTrack.setAttribute("aria-valuenow", String(completed));
-          els.searchTrack.setAttribute("aria-valuetext", completed + " recherches sur " + total);
+          els.searchTrack.setAttribute("aria-valuetext", completed + " pages lues sur " + total);
         } else {
           for (const attr of ["aria-valuemax", "aria-valuenow", "aria-valuetext"]) {
             els.searchTrack.removeAttribute(attr);
@@ -2181,6 +2345,7 @@
         if (els.searchTaskStatus.textContent !== message) {
           els.searchTaskStatus.textContent = message;
         }
+        renderSearchActivity(!restarting && !state.searchTaskError && phase !== "idle" ? task : null);
       }
 
       function renderProgress() {
@@ -2868,11 +3033,24 @@
         };
 
         const searchTask = payload.search;
+        const optionalNumber = value => Number.isFinite(value) && value >= 0 ? Math.floor(value) : null;
         state.searchTask = searchTask && typeof searchTask === "object" ? {
           status: asText(searchTask.status, "idle"),
           completed: Math.max(0, Math.floor(Number(searchTask.completed) || 0)),
           total: Math.max(0, Math.floor(Number(searchTask.total) || 0)),
           new_jobs: Math.max(0, Math.floor(Number(searchTask.new_jobs) || 0)),
+          elapsed_seconds: optionalNumber(searchTask.elapsed_seconds),
+          remaining_seconds: optionalNumber(searchTask.remaining_seconds),
+          seen_jobs: optionalNumber(searchTask.seen_jobs),
+          last_query: asText(searchTask.last_query, ""),
+          recent_jobs: Array.isArray(searchTask.recent_jobs)
+            ? searchTask.recent_jobs.slice(0, 4).filter(job => job && typeof job === "object").map(job => ({
+              job_title: asText(job.job_title, "Intitulé non précisé"),
+              business_name: asText(job.business_name, ""),
+              area: asText(job.area, "")
+            }))
+            : [],
+          received_at: performance.now(),
           can_start: searchTask.can_start === true,
           message: asText(searchTask.message, "")
         } : null;

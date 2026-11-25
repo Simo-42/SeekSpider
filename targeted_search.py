@@ -1,6 +1,7 @@
 """Collect the first SEEK search page for each target title, without a database."""
 import argparse
 import json
+import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from urllib.parse import urlencode
@@ -26,12 +27,48 @@ TITLES = [
 ]
 
 
+class SearchProgress:
+    def __init__(self, path=None):
+        self.path = path
+        self.started_at = time.time()
+        self.completed = 0
+        self.last_query = ""
+        self.seen_ids = set()
+        self.recent_jobs = []
+
+    def record_page(self, query, items):
+        preview = []
+        for item in items:
+            job_id = item["job_id"]
+            if job_id in self.seen_ids:
+                continue
+            self.seen_ids.add(job_id)
+            if len(preview) < 4 and item.get("job_title"):
+                preview.append({field: str(item.get(field) or "")[:180]
+                                for field in ("job_title", "business_name", "area")})
+        self.recent_jobs = (preview + self.recent_jobs)[:4]
+        self.completed += 1
+        self.last_query = query
+        self.save("running")
+
+    def save(self, status, new_jobs=0):
+        if not self.path:
+            return
+        temporary = self.path.with_suffix(".tmp")
+        temporary.write_text(json.dumps({
+            "status": status, "completed": self.completed, "total": len(TITLES), "new_jobs": new_jobs,
+            "started_at": self.started_at, "updated_at": time.time(),
+            "seen_jobs": len(self.seen_ids), "last_query": self.last_query, "recent_jobs": self.recent_jobs,
+        }, ensure_ascii=False), encoding="utf-8")
+        temporary.replace(self.path)
+
+
 class TargetedSeek(SeekSpider):
     name = "targeted_seek"
 
     def __init__(self, progress=None, **kwargs):
         super().__init__(**kwargs)
-        self.progress = progress
+        self.progress = progress if progress is not None else SearchProgress()
 
     def start_requests(self):
         for title in TITLES:
@@ -44,27 +81,17 @@ class TargetedSeek(SeekSpider):
         jobs = response.json()["data"]
         if not isinstance(jobs, list):
             raise ValueError(f"Réponse SEEK invalide : {query}")
+        items = []
         for job in jobs:
             item = dict(self.parse_job(job).meta["item"])
             item["region"] = "Australia"
             item["query"] = query
-            yield item
-        stats = self.crawler.stats
-        stats.inc_value("targeted_search/completed")
-        write_progress(self.progress, "running", stats.get_value("targeted_search/completed"))
+            items.append(item)
+        self.progress.record_page(query, items)
+        yield from items
 
     def closed(self, reason):
         pass  # No database or AI processing during this export.
-
-
-
-def write_progress(path, status, completed, new_jobs=0):
-    if path:
-        temporary = path.with_suffix(".tmp")
-        temporary.write_text(json.dumps({
-            "status": status, "completed": completed, "total": len(TITLES), "new_jobs": new_jobs,
-        }), encoding="utf-8")
-        temporary.replace(path)
 
 
 def index_jobs(path):
@@ -101,9 +128,8 @@ def main():
     parser.add_argument("--merge", action="store_true", help="Conserver les offres précédentes et suivre la progression locale")
     args = parser.parse_args()
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    progress = args.output.with_suffix(".search.json") if args.merge else None
-    completed = 0
-    write_progress(progress, "running", completed)
+    progress = SearchProgress(args.output.with_suffix(".search.json") if args.merge else None)
+    progress.save("running")
     try:
         # Keep the existing feed readable until all searches have succeeded.
         with TemporaryDirectory(dir=args.output.parent, prefix=".seekspider-") as work:
@@ -117,13 +143,12 @@ def main():
             crawler = process.create_crawler(TargetedSeek)
             process.crawl(crawler, progress=progress)
             process.start()
-            completed = crawler.stats.get_value("targeted_search/completed", 0)
-            if completed != len(TITLES) or crawler.stats.get_value("finish_reason") != "finished":
+            if progress.completed != len(TITLES) or crawler.stats.get_value("finish_reason") != "finished":
                 raise ValueError("Collecte SEEK incomplète ; export précédent conservé.")
             new_jobs = publish_feed(staged, args.output, args.merge)
-        write_progress(progress, "finished", completed, new_jobs)
+        progress.save("finished", new_jobs)
     except Exception:
-        write_progress(progress, "failed", completed)
+        progress.save("failed")
         raise
 
 

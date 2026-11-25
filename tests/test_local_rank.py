@@ -218,6 +218,28 @@ def test_search_merge_keeps_existing_jobs_and_ignores_duplicates(tmp_path):
     assert search.index_jobs(output)["2"]["job_title"] == "New"
 
 
+def test_live_search_counts_unique_ads_and_keeps_a_small_preview(tmp_path):
+    search = load_targeted_search()
+    status = tmp_path / "jobs.search.json"
+    progress = search.SearchProgress(status)
+    progress.record_page("Cloud Engineer", [
+        {"job_id": str(i), "job_title": f"Cloud Engineer {i}", "business_name": "Example", "area": "Sydney"}
+        for i in range(6)
+    ])
+    progress.record_page("DevOps Engineer", [
+        {"job_id": "2", "job_title": "Duplicate"},
+        {"job_id": "6", "job_title": "DevOps Engineer", "description": "Never preview the description"}
+    ])
+    data = json.loads(status.read_text(encoding="utf-8"))
+    assert data["completed"] == 2 and data["seen_jobs"] == 7
+    assert data["last_query"] == "DevOps Engineer"
+    assert len(data["recent_jobs"]) == 4
+    assert data["recent_jobs"][0] == {"job_title": "DevOps Engineer", "business_name": "", "area": ""}
+    progress.save("finished", new_jobs=1)
+    final = json.loads(status.read_text(encoding="utf-8"))
+    assert final["status"] == "finished" and final["updated_at"] >= final["started_at"]
+
+
 def test_incomplete_search_preserves_existing_export(tmp_path):
     import pytest
     search = load_targeted_search()
@@ -225,8 +247,11 @@ def test_incomplete_search_preserves_existing_export(tmp_path):
     original = '{"job_id":"1"}\n'
     output.write_text(original, encoding="utf-8")
     with patch("sys.argv", ["targeted_search", str(output), "--merge"]), patch.object(search, "CrawlerProcess") as process:
-        stats = {"targeted_search/completed": 2, "finish_reason": "finished"}
-        process.return_value.create_crawler.return_value.stats.get_value.side_effect = stats.get
+        process.return_value.create_crawler.return_value.stats.get_value.return_value = "finished"
+        def crawl(_crawler, progress):
+            for query in search.TITLES[:2]:
+                progress.record_page(query, [])
+        process.return_value.crawl.side_effect = crawl
         with pytest.raises(ValueError, match="incomplète"):
             search.main()
     assert output.read_text(encoding="utf-8") == original

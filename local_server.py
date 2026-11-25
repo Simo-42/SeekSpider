@@ -1,9 +1,11 @@
 """Serve the local job dashboard on loopback only, without exposing the CV."""
 import argparse
 import json
+import math
 import re
 import subprocess
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
@@ -70,6 +72,7 @@ def search_state(jobs_path, running, analysing):
         status = saved["status"]
         completed, total, new_jobs = (int(saved[key]) for key in ("completed", "total", "new_jobs"))
     except (OSError, ValueError, KeyError, TypeError):
+        saved = {}
         status, completed, total, new_jobs = "idle", 0, 0, 0
     if running:
         status = "running"
@@ -83,8 +86,22 @@ def search_state(jobs_path, running, analysing):
         message = "Recherche interrompue ou incomplète. Les offres enregistrées restent disponibles."
     else:
         status, message = "idle", ""
+    elapsed_seconds = remaining_seconds = None
+    started, updated = saved.get("started_at"), saved.get("updated_at")
+    if all(isinstance(value, (int, float)) and math.isfinite(value) for value in (started, updated)) and updated >= started:
+        active = running and saved.get("status") == "running"
+        elapsed = max(0, (time.time() if active else updated) - started)
+        elapsed_seconds = int(elapsed)
+        if active and 4 <= completed < total:
+            # Use completed pages only to estimate the rate, and allow time already spent on the next page.
+            projection = (updated - started) * total / completed - elapsed
+            if projection > 0:
+                remaining_seconds = math.ceil(projection)
     return {"status": status, "message": message, "completed": completed, "total": total,
-            "new_jobs": new_jobs, "can_start": not running and not analysing}
+            "new_jobs": new_jobs, "can_start": not running and not analysing,
+            "elapsed_seconds": elapsed_seconds, "remaining_seconds": remaining_seconds,
+            "seen_jobs": saved.get("seen_jobs"), "last_query": saved.get("last_query", ""),
+            "recent_jobs": saved.get("recent_jobs", [])}
 
 
 def state(jobs_path, report, total, container, profile=None, search_container=""):
