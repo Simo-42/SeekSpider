@@ -1002,6 +1002,14 @@
       overflow-wrap: anywhere;
     }
 
+    .job-analysed {
+      padding: 1px 7px;
+      border-radius: var(--radius-pill);
+      background: var(--success-bg);
+      color: var(--success-text);
+      font-weight: 600;
+    }
+
     .job-snippet {
       margin: 0;
       font-size: 0.84375rem;
@@ -1539,9 +1547,9 @@
         </div>
         <div class="search-activity" id="search-activity" hidden>
           <dl class="search-metrics" id="search-metrics" aria-label="Activité de collecte">
-            <div id="search-seen-row" hidden>
-              <dt>Offres uniques vues</dt>
-              <dd id="search-seen"></dd>
+            <div id="search-discovered-row" hidden>
+              <dt>Nouvelles offres repérées</dt>
+              <dd id="search-discovered"></dd>
             </div>
             <div id="search-elapsed-row" hidden>
               <dt>Temps écoulé</dt>
@@ -1555,8 +1563,8 @@
           <p class="search-query" id="search-query" hidden>Dernière page lue : <strong id="search-query-name"></strong></p>
         </div>
         <details class="search-preview" id="search-preview" open hidden>
-          <summary>Dernières offres vues</summary>
-          <ul id="search-recent-jobs"></ul>
+          <summary>Dernières nouvelles offres</summary>
+          <ul id="search-recent-new-jobs"></ul>
         </details>
       </section>
 
@@ -1791,8 +1799,8 @@
         searchFill: document.getElementById("search-fill"),
         searchActivity: document.getElementById("search-activity"),
         searchMetrics: document.getElementById("search-metrics"),
-        searchSeenRow: document.getElementById("search-seen-row"),
-        searchSeen: document.getElementById("search-seen"),
+        searchDiscoveredRow: document.getElementById("search-discovered-row"),
+        searchDiscovered: document.getElementById("search-discovered"),
         searchElapsedRow: document.getElementById("search-elapsed-row"),
         searchElapsed: document.getElementById("search-elapsed"),
         searchRemainingRow: document.getElementById("search-remaining-row"),
@@ -1800,7 +1808,7 @@
         searchQuery: document.getElementById("search-query"),
         searchQueryName: document.getElementById("search-query-name"),
         searchPreview: document.getElementById("search-preview"),
-        searchRecentJobs: document.getElementById("search-recent-jobs"),
+        searchRecentNewJobs: document.getElementById("search-recent-new-jobs"),
         progressStatusPill: document.getElementById("progress-status-pill"),
         progressMessage: document.getElementById("progress-message"),
         startAnalysisBtn: document.getElementById("start-analysis-btn"),
@@ -2257,16 +2265,16 @@
 
       function renderSearchActivity(task) {
         const running = task && task.status === "running";
-        const showSeen = task && task.seen_jobs !== null;
+        const showDiscovered = task && task.discovered_jobs !== null;
         const showElapsed = task && task.elapsed_seconds !== null;
-        const showEstimate = running && (showElapsed || showSeen || task.remaining_seconds !== null);
-        const showMetrics = showSeen || showElapsed || showEstimate;
+        const showEstimate = running && (showElapsed || showDiscovered || task.remaining_seconds !== null);
+        const showMetrics = showDiscovered || showElapsed || showEstimate;
         els.searchActivity.hidden = !showMetrics && !(task && task.last_query);
         els.searchMetrics.hidden = !showMetrics;
-        els.searchSeenRow.hidden = !showSeen;
+        els.searchDiscoveredRow.hidden = !showDiscovered;
         els.searchElapsedRow.hidden = !showElapsed;
         els.searchRemainingRow.hidden = !showEstimate;
-        if (showSeen) els.searchSeen.textContent = task.seen_jobs.toLocaleString("fr-FR");
+        if (showDiscovered) els.searchDiscovered.textContent = task.discovered_jobs.toLocaleString("fr-FR");
         els.searchQuery.hidden = !(task && task.last_query);
         if (!els.searchQuery.hidden) els.searchQueryName.textContent = task.last_query;
         renderSearchClock();
@@ -2278,12 +2286,12 @@
           searchClock = null;
         }
 
-        const recent = task ? task.recent_jobs : [];
+        const recent = task ? task.recent_new_jobs : [];
         els.searchPreview.hidden = recent.length === 0;
         const signature = JSON.stringify(recent);
         if (signature === searchPreviewSignature) return;
         searchPreviewSignature = signature;
-        els.searchRecentJobs.replaceChildren();
+        els.searchRecentNewJobs.replaceChildren();
         for (const job of recent) {
           const item = document.createElement("li");
           const title = document.createElement("strong");
@@ -2291,7 +2299,7 @@
           item.appendChild(title);
           const context = [job.business_name, job.area].filter(Boolean).join(" · ");
           if (context) item.append(" — " + context);
-          els.searchRecentJobs.appendChild(item);
+          els.searchRecentNewJobs.appendChild(item);
         }
       }
 
@@ -2316,9 +2324,6 @@
             failed: "La recherche sur SEEK a échoué."
           };
           message = task.message || defaults[task.status] || defaults.idle;
-          if (task.status === "finished" && task.new_jobs > 0 && state.progress.can_start) {
-            message += " Pour analyser les offres retenues, cliquez sur « Démarrer ou reprendre ».";
-          }
         }
         const restarting = pending && !running;
         const phase = state.searchTaskError ? "failed" : restarting ? "running" : task && task.status;
@@ -2559,6 +2564,15 @@
 
           const metaRow = document.createElement("div");
           metaRow.className = "job-meta-row";
+
+          if (analysis && analysis.score !== null) {
+            const analysed = document.createElement("span");
+            analysed.className = "meta-chip job-analysed";
+            const icon = createSvgIcon("check");
+            icon.setAttribute("aria-hidden", "true");
+            analysed.append(icon, "Analysée");
+            metaRow.appendChild(analysed);
+          }
 
           const areaChip = document.createElement("span");
           areaChip.className = "meta-chip";
@@ -3041,10 +3055,10 @@
           new_jobs: Math.max(0, Math.floor(Number(searchTask.new_jobs) || 0)),
           elapsed_seconds: optionalNumber(searchTask.elapsed_seconds),
           remaining_seconds: optionalNumber(searchTask.remaining_seconds),
-          seen_jobs: optionalNumber(searchTask.seen_jobs),
+          discovered_jobs: optionalNumber(searchTask.discovered_jobs),
           last_query: asText(searchTask.last_query, ""),
-          recent_jobs: Array.isArray(searchTask.recent_jobs)
-            ? searchTask.recent_jobs.slice(0, 4).filter(job => job && typeof job === "object").map(job => ({
+          recent_new_jobs: Array.isArray(searchTask.recent_new_jobs)
+            ? searchTask.recent_new_jobs.slice(0, 4).filter(job => job && typeof job === "object").map(job => ({
               job_title: asText(job.job_title, "Intitulé non précisé"),
               business_name: asText(job.business_name, ""),
               area: asText(job.area, "")

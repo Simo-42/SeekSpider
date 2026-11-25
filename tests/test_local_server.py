@@ -130,17 +130,28 @@ def test_search_estimate_tracks_processed_pages_and_freezes_at_completion(tmp_pa
     status = jobs.with_suffix(".search.json")
     snapshot = {
         "status": "running", "completed": 12, "total": 42, "new_jobs": 0,
-        "started_at": 1000, "updated_at": 1060, "seen_jobs": 150,
-        "last_query": "SRE", "recent_jobs": [{"job_title": "SRE", "business_name": "Example", "area": "Perth"}],
+        "started_at": 1000, "updated_at": 1060, "discovered_jobs": 150,
+        "last_query": "SRE", "recent_new_jobs": [{"job_title": "SRE", "business_name": "Example", "area": "Perth"}],
     }
     status.write_text(json.dumps(snapshot))
     with patch.object(server.time, "time", return_value=1065):
         live = server.search_state(jobs, True, False)
     assert live["elapsed_seconds"] == 65 and live["remaining_seconds"] == 145
-    assert live["seen_jobs"] == 150 and live["recent_jobs"][0]["job_title"] == "SRE"
+    assert live["discovered_jobs"] == 150 and live["recent_new_jobs"][0]["job_title"] == "SRE"
     with patch.object(server.time, "time", return_value=1250):
         stalled = server.search_state(jobs, True, False)
     assert stalled["elapsed_seconds"] == 250 and stalled["remaining_seconds"] is None
     status.write_text(json.dumps({**snapshot, "completed": 42, "status": "finished", "updated_at": 1215}))
     finished = server.search_state(jobs, False, False)
     assert finished["elapsed_seconds"] == 215 and finished["remaining_seconds"] is None
+
+
+def test_legacy_search_previews_do_not_appear_as_new_ads(tmp_path):
+    jobs = tmp_path / "jobs.jsonl"
+    jobs.with_suffix(".search.json").write_text(json.dumps({
+        "status": "finished", "completed": 42, "total": 42, "new_jobs": 3,
+        "seen_jobs": 100, "recent_jobs": [{"job_title": "Already known"}],
+    }))
+    state = server.search_state(jobs, False, False)
+    assert state["new_jobs"] == 3 and state["discovered_jobs"] is None
+    assert state["recent_new_jobs"] == []

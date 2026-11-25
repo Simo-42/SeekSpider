@@ -66,9 +66,17 @@ def container_running(container):
         return False
 
 
-def search_state(jobs_path, running, analysing):
+def read_search(jobs_path):
     try:
         saved = json.loads(jobs_path.resolve().with_suffix(".search.json").read_text(encoding="utf-8"))
+        return saved if isinstance(saved, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def search_state(jobs_path, running, analysing):
+    saved = read_search(jobs_path)
+    try:
         status = saved["status"]
         completed, total, new_jobs = (int(saved[key]) for key in ("completed", "total", "new_jobs"))
     except (OSError, ValueError, KeyError, TypeError):
@@ -100,8 +108,8 @@ def search_state(jobs_path, running, analysing):
     return {"status": status, "message": message, "completed": completed, "total": total,
             "new_jobs": new_jobs, "can_start": not running and not analysing,
             "elapsed_seconds": elapsed_seconds, "remaining_seconds": remaining_seconds,
-            "seen_jobs": saved.get("seen_jobs"), "last_query": saved.get("last_query", ""),
-            "recent_jobs": saved.get("recent_jobs", [])}
+            "discovered_jobs": saved.get("discovered_jobs"), "last_query": saved.get("last_query", ""),
+            "recent_new_jobs": saved.get("recent_new_jobs", [])}
 
 
 def state(jobs_path, report, total, container, profile=None, search_container=""):
@@ -187,13 +195,66 @@ def main():
     jobs_path = args.jobs.resolve()
     lock = threading.Lock()
 
+    handoff = {"pending": False, "message": ""}
+
+    def current_state():
+        return state(args.jobs, args.report, args.total, container, args.profile, search_container)
+
+    def start_analysis(collected=None):
+        network = ["--network", "container:seekspider-ollama"] if container_running("seekspider-ollama") else []
+        extra_mount = ["-v", f"{collected}:/private/collected.json:ro"] if collected else []
+        subset = ["--collected", "/private/collected.json"] if collected else []
+        command = ["docker", "run", "-d", "--rm", "--name", container,
+            *network, "--entrypoint", "python",
+            "-v", f"{project}:/src:ro", "-v", f"{jobs_path}:/data/jobs.jsonl:ro",
+            "-v", f"{args.report.resolve().parent}:/results",
+            "-v", f"{args.profile.resolve()}:/private/profile.txt:ro", *extra_mount, "seekspider-run",
+            "/src/local_rank.py", "/data/jobs.jsonl", f"/results/{args.report.name}",
+            "--profile", "/private/profile.txt", "--limit", "1000000", "--resume", *subset]
+        result = subprocess.run(command, capture_output=True, text=True, timeout=30)
+        if result.returncode:
+            raise ValueError("Impossible de lancer l'analyse. Vérifie Docker et la présence de l'image seekspider-run.")
+
+    def analyse_after_search(worker_id):
+        message = ""
+        try:
+            result = subprocess.run(["docker", "wait", worker_id], capture_output=True, text=True, timeout=420)
+            if result.returncode or result.stdout.strip() != "0":
+                return
+            with lock:
+                saved = read_search(jobs_path)
+                added = set(saved.get("added_job_ids", []))
+                if saved.get("status") != "finished" or not added:
+                    return
+                current = current_state()
+                if not any(str(job["job_id"]) in added for job in current["jobs"]):
+                    message = "Aucune nouvelle offre dans les familles ciblées."
+                elif not current["progress"]["can_start"]:
+                    message = "Analyse automatique en attente. Vérifiez le CV chargé ou utilisez « Démarrer ou reprendre »."
+                else:
+                    start_analysis(jobs_path.with_suffix(".search.json"))
+                    message = "Analyse automatique des nouvelles offres lancée."
+        except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
+            print(f"Analyse après collecte : {exc}", flush=True)
+            message = "Analyse automatique indisponible. Utilisez « Démarrer ou reprendre »."
+        finally:
+            with lock:
+                handoff.update(pending=False, message=message)
+
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             route = urlparse(self.path).path
             if route == "/":
                 content, content_type = html.read_bytes(), "text/html; charset=utf-8"
             elif route == "/api/state":
-                content = json.dumps(state(args.jobs, args.report, args.total, container, args.profile, search_container), ensure_ascii=False).encode("utf-8")
+                payload = current_state()
+                if handoff["pending"]:
+                    payload["search"]["can_start"] = payload["progress"]["can_start"] = False
+                if payload["search"]["status"] == "finished":
+                    message = "Démarrage de l’analyse des nouvelles offres…" if handoff["pending"] else handoff["message"]
+                    if message:
+                        payload["search"]["message"] += " " + message
+                content = json.dumps(payload, ensure_ascii=False).encode("utf-8")
                 content_type = "application/json; charset=utf-8"
             else:
                 self.send_error(404)
@@ -220,7 +281,7 @@ def main():
                 route = urlparse(self.path).path
                 with lock:
                     if route == "/api/search/start":
-                        if container_running(container) or container_running(search_container):
+                        if handoff["pending"] or container_running(container) or container_running(search_container):
                             raise ValueError("Une recherche ou une analyse est déjà en cours.")
                         jobs_path.parent.mkdir(parents=True, exist_ok=True)
                         command = ["docker", "run", "-d", "--rm", "--name", search_container,
@@ -229,21 +290,12 @@ def main():
                         result = subprocess.run(command, capture_output=True, text=True, timeout=30)
                         if result.returncode:
                             raise ValueError("Impossible de lancer la recherche. Vérifie Docker et l’image seekspider-run.")
+                        handoff.update(pending=True, message="")
+                        threading.Thread(target=analyse_after_search, args=(result.stdout.strip(),), daemon=True).start()
                     elif route == "/api/analysis/start":
-                        current = state(args.jobs, args.report, args.total, container, args.profile, search_container)
-                        if not current["progress"]["can_start"]:
+                        if handoff["pending"] or not current_state()["progress"]["can_start"]:
                             raise ValueError("Démarrage impossible : profil manquant, aucune offre restante ou une tâche est déjà active.")
-                        network = ["--network", "container:seekspider-ollama"] if container_running("seekspider-ollama") else []
-                        command = ["docker", "run", "-d", "--rm", "--name", container,
-                            *network, "--entrypoint", "python",
-                            "-v", f"{project}:/src:ro", "-v", f"{args.jobs.resolve()}:/data/jobs.jsonl:ro",
-                            "-v", f"{args.report.resolve().parent}:/results",
-                            "-v", f"{args.profile.resolve()}:/private/profile.txt:ro", "seekspider-run",
-                            "/src/local_rank.py", "/data/jobs.jsonl", f"/results/{args.report.name}",
-                            "--profile", "/private/profile.txt", "--limit", "1000000", "--resume"]
-                        result = subprocess.run(command, capture_output=True, text=True, timeout=30)
-                        if result.returncode:
-                            raise ValueError("Impossible de lancer l'analyse. Vérifie Docker et la présence de l'image seekspider-run.")
+                        start_analysis()
                     elif route == "/api/analysis/stop":
                         if not container_running(container):
                             raise ValueError("Aucune analyse active.")

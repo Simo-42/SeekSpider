@@ -212,22 +212,31 @@ def main():
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--model", default="lfm3:1.7b")
     parser.add_argument("--resume", action="store_true", help="Conserver et reprendre les analyses déjà enregistrées")
+    parser.add_argument("--collected", type=Path, help="N'analyser que les offres ajoutées par cette collecte")
     args = parser.parse_args()
+    if args.collected and not args.resume:
+        parser.error("--collected nécessite --resume pour conserver l'historique")
     if args.limit < 1:
         parser.error("--limit doit être positif")
     profile = args.profile.read_text(encoding="utf-8") if args.profile else ""
     fingerprint = profile_fingerprint(profile)
+    added_ids = (set(json.loads(args.collected.read_text(encoding="utf-8"))["added_job_ids"])
+                 if args.collected else None)
     results, failures, exclusions = [], [], []
     saved = args.output.with_suffix(".json")
     if args.resume and saved.exists():
         data = json.loads(saved.read_text(encoding="utf-8"))
         results = data["analyses"]
         exclusions = data.get("exclusions", [])
+        if added_ids is not None:
+            failures = [row for row in data.get("echecs", []) if str(row["job"]["job_id"]) not in added_ids]
         if not isinstance(results, list):
             raise ValueError("Fichier d'analyses invalide")
         if not isinstance(exclusions, list):
             raise ValueError("Fichier d'exclusions invalide")
     jobs = select_jobs(args.input)
+    if added_ids is not None:
+        jobs = [job for job in jobs if str(job["job_id"]) in added_ids]
     existing = {str(row["offre"]["job_id"]): row for row in results}
     excluded_ids = {str(row["job"]["job_id"]) for row in exclusions}
     stale = [job for job in jobs if str(job["job_id"]) in existing

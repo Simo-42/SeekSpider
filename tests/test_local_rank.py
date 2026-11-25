@@ -213,16 +213,17 @@ def test_search_merge_keeps_existing_jobs_and_ignores_duplicates(tmp_path):
     output, staged = tmp_path / "jobs.jsonl", tmp_path / "staged.jsonl"
     output.write_text('{"job_id":"1"}\n{"job_id":"2","job_title":"Old"}\n', encoding="utf-8")
     staged.write_text('{"job_id":"2","job_title":"New"}\n{"job_id":"3"}\n{"job_id":"3"}\n', encoding="utf-8")
-    assert search.publish_feed(staged, output, merge=True) == 1
+    assert search.publish_feed(staged, output, merge=True) == ["3"]
     assert list(search.index_jobs(output)) == ["1", "2", "3"]
-    assert search.index_jobs(output)["2"]["job_title"] == "New"
+    assert search.index_jobs(output)["2"]["job_title"] == "Old"
 
 
-def test_live_search_counts_unique_ads_and_keeps_a_small_preview(tmp_path):
+def test_live_search_ignores_saved_ads_and_keeps_a_small_preview(tmp_path):
     search = load_targeted_search()
     status = tmp_path / "jobs.search.json"
     progress = search.SearchProgress(status)
-    progress.record_page("Cloud Engineer", [
+    progress.known_ids.add("0")
+    first_page = progress.record_page("Cloud Engineer", [
         {"job_id": str(i), "job_title": f"Cloud Engineer {i}", "business_name": "Example", "area": "Sydney"}
         for i in range(6)
     ])
@@ -231,13 +232,15 @@ def test_live_search_counts_unique_ads_and_keeps_a_small_preview(tmp_path):
         {"job_id": "6", "job_title": "DevOps Engineer", "description": "Never preview the description"}
     ])
     data = json.loads(status.read_text(encoding="utf-8"))
-    assert data["completed"] == 2 and data["seen_jobs"] == 7
+    assert [job["job_id"] for job in first_page] == ["1", "2", "3", "4", "5"]
+    assert data["completed"] == 2 and data["discovered_jobs"] == 6
     assert data["last_query"] == "DevOps Engineer"
-    assert len(data["recent_jobs"]) == 4
-    assert data["recent_jobs"][0] == {"job_title": "DevOps Engineer", "business_name": "", "area": ""}
-    progress.save("finished", new_jobs=1)
+    assert len(data["recent_new_jobs"]) == 4
+    assert data["recent_new_jobs"][0] == {"job_title": "DevOps Engineer", "business_name": "", "area": ""}
+    progress.save("finished", added_job_ids=["6"])
     final = json.loads(status.read_text(encoding="utf-8"))
     assert final["status"] == "finished" and final["updated_at"] >= final["started_at"]
+    assert final["added_job_ids"] == ["6"] and final["new_jobs"] == 1
 
 
 def test_incomplete_search_preserves_existing_export(tmp_path):
@@ -267,10 +270,13 @@ def test_resume_preserves_existing_and_skips_it(tmp_path):
     report.with_suffix('.json').write_text(json.dumps({"analyses": [existing], "echecs": []}), encoding="utf-8")
     with patch('sys.argv', ['local_rank', str(jobs), str(report), '--resume', '--limit', '1']), \
          patch.object(rank.fetcher, 'fetch_job_detail', return_value=('<p>Cloud</p>', None, 'success')) as fetch, \
-         patch.object(rank, 'analyze', return_value=existing['analyse']), \
+         patch.object(rank, 'analyze', return_value=existing['analyse']) as model, \
          patch.object(rank.time, 'sleep'):
         rank.main()
+        rank.main()
     fetch.assert_called_once_with('2')
+    model.assert_called_once()
+    assert model.call_args.args[0]["job_id"] == "2"
     data = json.loads(report.with_suffix('.json').read_text(encoding='utf-8'))
     assert [row['offre']['job_id'] for row in data['analyses']] == ['1', '2']
 
@@ -307,3 +313,25 @@ def test_resume_rescores_cached_description_with_new_cv(tmp_path):
     analysis = json.loads(report.with_suffix(".json").read_text())["analyses"][0]["analyse"]
     assert analysis["competences_reperees"] == ["Terraform"]
     assert analysis["profile_fingerprint"] == rank.profile_fingerprint("Terraform")
+
+
+def test_analysis_after_search_only_processes_added_job_ids(tmp_path):
+    jobs, report, collected = (tmp_path / name for name in ("jobs.jsonl", "report.md", "jobs.search.json"))
+    old = {"job_id": "4", "job_title": "Cloud Support Engineer"}
+    new = {"job_id": "5", "job_title": "SRE"}
+    known_failure = {"job_id": "6", "job_title": "IT Support Engineer"}
+    jobs.write_text("\n".join(map(json.dumps, [old, new, known_failure])), encoding="utf-8")
+    collected.write_text(json.dumps({"added_job_ids": ["5"]}), encoding="utf-8")
+    report.with_suffix(".json").write_text(json.dumps({
+        "analyses": [], "echecs": [{"job": known_failure, "status": "timeout"}]
+    }), encoding="utf-8")
+    analysis = rank.refresh_existing_analysis({}, new, "AWS", "")
+    with patch("sys.argv", ["local_rank", str(jobs), str(report), "--resume", "--collected", str(collected)]), \
+         patch.object(rank.fetcher, "fetch_job_detail", return_value=("<p>AWS</p>", None, "success")) as fetch, \
+         patch.object(rank, "analyze", return_value=analysis) as model, patch.object(rank.time, "sleep"):
+        rank.main()
+    fetch.assert_called_once_with("5")
+    model.assert_called_once()
+    data = json.loads(report.with_suffix(".json").read_text())
+    assert [row["offre"]["job_id"] for row in data["analyses"]] == ["5"]
+    assert data["echecs"][0]["job"]["job_id"] == "6"

@@ -33,32 +33,39 @@ class SearchProgress:
         self.started_at = time.time()
         self.completed = 0
         self.last_query = ""
-        self.seen_ids = set()
-        self.recent_jobs = []
+        self.known_ids = set()
+        self.discovered_jobs = 0
+        self.recent_new_jobs = []
 
     def record_page(self, query, items):
+        new_items = []
         preview = []
         for item in items:
-            job_id = item["job_id"]
-            if job_id in self.seen_ids:
+            job_id = str(item["job_id"])
+            if job_id in self.known_ids:
                 continue
-            self.seen_ids.add(job_id)
+            self.known_ids.add(job_id)
+            new_items.append(item)
             if len(preview) < 4 and item.get("job_title"):
                 preview.append({field: str(item.get(field) or "")[:180]
                                 for field in ("job_title", "business_name", "area")})
-        self.recent_jobs = (preview + self.recent_jobs)[:4]
+        self.discovered_jobs += len(new_items)
+        self.recent_new_jobs = (preview + self.recent_new_jobs)[:4]
         self.completed += 1
         self.last_query = query
         self.save("running")
+        return new_items
 
-    def save(self, status, new_jobs=0):
+    def save(self, status, added_job_ids=()):
         if not self.path:
             return
         temporary = self.path.with_suffix(".tmp")
         temporary.write_text(json.dumps({
-            "status": status, "completed": self.completed, "total": len(TITLES), "new_jobs": new_jobs,
+            "status": status, "completed": self.completed, "total": len(TITLES),
+            "new_jobs": len(added_job_ids), "added_job_ids": list(added_job_ids),
             "started_at": self.started_at, "updated_at": time.time(),
-            "seen_jobs": len(self.seen_ids), "last_query": self.last_query, "recent_jobs": self.recent_jobs,
+            "discovered_jobs": self.discovered_jobs, "last_query": self.last_query,
+            "recent_new_jobs": self.recent_new_jobs,
         }, ensure_ascii=False), encoding="utf-8")
         temporary.replace(self.path)
 
@@ -87,8 +94,8 @@ class TargetedSeek(SeekSpider):
             item["region"] = "Australia"
             item["query"] = query
             items.append(item)
-        self.progress.record_page(query, items)
-        yield from items
+        new_items = self.progress.record_page(query, items)
+        yield from new_items if self.progress.path else items
 
     def closed(self, reason):
         pass  # No database or AI processing during this export.
@@ -108,18 +115,17 @@ def index_jobs(path):
 def publish_feed(staged, output, merge):
     if not merge:
         staged.replace(output)
-        return 0
+        return []
     existing = index_jobs(output)
-    fresh = index_jobs(staged)
-    new_jobs = len(fresh.keys() - existing.keys())
-    if not fresh:
-        return 0
-    existing.update(fresh)
+    new = {job_id: job for job_id, job in index_jobs(staged).items() if job_id not in existing}
+    if not new:
+        return []
+    existing.update(new)
     with staged.open("w", encoding="utf-8") as feed:
         for job in existing.values():
             feed.write(json.dumps(job, ensure_ascii=False) + "\n")
     staged.replace(output)
-    return new_jobs
+    return list(new)
 
 
 def main():
@@ -131,6 +137,8 @@ def main():
     progress = SearchProgress(args.output.with_suffix(".search.json") if args.merge else None)
     progress.save("running")
     try:
+        if args.merge:
+            progress.known_ids.update(index_jobs(args.output))
         # Keep the existing feed readable until all searches have succeeded.
         with TemporaryDirectory(dir=args.output.parent, prefix=".seekspider-") as work:
             staged = Path(work) / "jobs.jsonl"
@@ -145,8 +153,8 @@ def main():
             process.start()
             if progress.completed != len(TITLES) or crawler.stats.get_value("finish_reason") != "finished":
                 raise ValueError("Collecte SEEK incomplète ; export précédent conservé.")
-            new_jobs = publish_feed(staged, args.output, args.merge)
-        progress.save("finished", new_jobs)
+            added_job_ids = publish_feed(staged, args.output, args.merge)
+        progress.save("finished", added_job_ids)
     except Exception:
         progress.save("failed")
         raise
