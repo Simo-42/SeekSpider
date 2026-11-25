@@ -1,6 +1,7 @@
 import importlib.util
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location("local_server", Path(__file__).resolve().parents[1] / "local_server.py")
 server = importlib.util.module_from_spec(spec)
@@ -106,3 +107,19 @@ def test_show_professional_profile_and_hide_score_after_cv_changes(tmp_path):
     assert updated["profile"]["skills"] == ["Terraform"]
     assert updated["analyses"]["1"]["score"] is None
     assert updated["progress"]["stale"] == 1 and updated["progress"]["can_start"]
+
+
+def test_search_progress_disables_analysis_and_reports_a_stopped_worker(tmp_path):
+    jobs, report, profile = (tmp_path / name for name in ("jobs.jsonl", "report.md", "profile.txt"))
+    jobs.write_text('{"job_id":"1","job_title":"Cloud Engineer"}\n', encoding="utf-8")
+    profile.write_text("AWS", encoding="utf-8")
+    jobs.with_suffix(".search.json").write_text(json.dumps({
+        "status": "running", "completed": 12, "total": 42, "new_jobs": 0
+    }), encoding="utf-8")
+    with patch.object(server, "container_running", side_effect=lambda name: name == "search"):
+        payload = server.state(jobs, report, 1, "analysis", profile, "search")
+    assert payload["search"]["status"] == "running" and payload["search"]["completed"] == 12
+    assert not payload["search"]["can_start"] and not payload["progress"]["can_start"]
+    stopped = server.state(jobs, report, 1, "", profile)
+    assert stopped["search"]["status"] == "failed"
+    assert stopped["search"]["can_start"] and stopped["progress"]["can_start"]

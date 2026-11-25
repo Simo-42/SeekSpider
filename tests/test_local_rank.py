@@ -190,10 +190,15 @@ def test_experience_proof_ignores_company_history_and_contracts():
     assert rank.experience_exclusion(text) is None
 
 
-def test_search_targets_all_titles_and_australia():
+def load_targeted_search():
     search_spec = importlib.util.spec_from_file_location("targeted_search", Path(__file__).resolve().parents[1] / "targeted_search.py")
     search = importlib.util.module_from_spec(search_spec)
     search_spec.loader.exec_module(search)
+    return search
+
+
+def test_search_targets_all_titles_and_australia():
+    search = load_targeted_search()
     requests = list(search.TargetedSeek().start_requests())
     assert len(requests) == len(search.TITLES) == 42
     assert all(rank.is_target_role({"job_title": title}) for title in search.TITLES)
@@ -201,6 +206,33 @@ def test_search_targets_all_titles_and_australia():
     assert all(query["where"] == ["Australia"] for query in queries)
     assert {query["keywords"][0] for query in queries} == set(search.TITLES)
 
+
+
+def test_search_merge_keeps_existing_jobs_and_ignores_duplicates(tmp_path):
+    search = load_targeted_search()
+    output, staged = tmp_path / "jobs.jsonl", tmp_path / "staged.jsonl"
+    output.write_text('{"job_id":"1"}\n{"job_id":"2","job_title":"Old"}\n', encoding="utf-8")
+    staged.write_text('{"job_id":"2","job_title":"New"}\n{"job_id":"3"}\n{"job_id":"3"}\n', encoding="utf-8")
+    assert search.publish_feed(staged, output, merge=True) == 1
+    assert list(search.index_jobs(output)) == ["1", "2", "3"]
+    assert search.index_jobs(output)["2"]["job_title"] == "New"
+
+
+def test_incomplete_search_preserves_existing_export(tmp_path):
+    import pytest
+    search = load_targeted_search()
+    output = tmp_path / "jobs.jsonl"
+    original = '{"job_id":"1"}\n'
+    output.write_text(original, encoding="utf-8")
+    with patch("sys.argv", ["targeted_search", str(output), "--merge"]), patch.object(search, "CrawlerProcess") as process:
+        stats = {"targeted_search/completed": 2, "finish_reason": "finished"}
+        process.return_value.create_crawler.return_value.stats.get_value.side_effect = stats.get
+        with pytest.raises(ValueError, match="incomplète"):
+            search.main()
+    assert output.read_text(encoding="utf-8") == original
+    progress = json.loads(output.with_suffix(".search.json").read_text())
+    assert progress["status"] == "failed"
+    assert progress["completed"] == 2
 
 def test_resume_preserves_existing_and_skips_it(tmp_path):
     jobs = tmp_path / "jobs.jsonl"

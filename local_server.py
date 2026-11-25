@@ -64,7 +64,30 @@ def container_running(container):
         return False
 
 
-def state(jobs_path, report, total, container, profile=None):
+def search_state(jobs_path, running, analysing):
+    try:
+        saved = json.loads(jobs_path.resolve().with_suffix(".search.json").read_text(encoding="utf-8"))
+        status = saved["status"]
+        completed, total, new_jobs = (int(saved[key]) for key in ("completed", "total", "new_jobs"))
+    except (OSError, ValueError, KeyError, TypeError):
+        status, completed, total, new_jobs = "idle", 0, 0, 0
+    if running:
+        status = "running"
+    elif status == "running":
+        status = "failed"
+    if status == "running":
+        message = "Recherche SEEK en cours."
+    elif status == "finished":
+        message = f"Recherche terminée. Nouvelles annonces SEEK collectées : {new_jobs}."
+    elif status == "failed":
+        message = "Recherche interrompue ou incomplète. Les offres enregistrées restent disponibles."
+    else:
+        status, message = "idle", ""
+    return {"status": status, "message": message, "completed": completed, "total": total,
+            "new_jobs": new_jobs, "can_start": not running and not analysing}
+
+
+def state(jobs_path, report, total, container, profile=None, search_container=""):
     try:
         profile_text = profile.read_text(encoding="utf-8") if profile else ""
     except (OSError, UnicodeError):
@@ -91,6 +114,7 @@ def state(jobs_path, report, total, container, profile=None):
             updated["visa_sponsoring"] = "Visa et droit au travail à vérifier dans l'annonce."
         analyses[job_id] = updated
     running = container_running(container)
+    searching = container_running(search_container)
     excluded_ids = {job_id for job_id, analysis in analyses.items()
                     if experience_exclusion(analysis.get("preuve_experience", ""))}
     failed_ids = set()
@@ -120,12 +144,13 @@ def state(jobs_path, report, total, container, profile=None):
         message = (f"Analyse en pause : {stale} score(s) à recalculer, {pending - stale} offre(s) à analyser, {failures} échec(s) à réessayer" if pending or failures
                    else "Analyse en pause ; les résultats enregistrés sont conservés")
     return {"jobs": jobs, "analyses": analyses, "profile": profile_summary(profile_text),
+            "search": search_state(jobs_path, searching, running),
             "progress": {"completed": completed, "total": len(jobs), "status": status, "message": message,
                          "excluded": len(all_jobs) - len(jobs),
                          "stale": stale,
                          "pending": pending,
                          "failed": failures,
-                         "can_start": bool(profile_text.strip() and jobs and not running and completed < len(jobs)),
+                         "can_start": bool(profile_text.strip() and jobs and not running and not searching and completed < len(jobs)),
                          "can_stop": running}}
 
 
@@ -140,6 +165,9 @@ def main():
     args = parser.parse_args()
     html = Path(__file__).parent / "local_ui/index.html"
     container = "seekspider-ranking"
+    search_container = "seekspider-search"
+    project = Path(__file__).resolve().parent
+    jobs_path = args.jobs.resolve()
     lock = threading.Lock()
 
     class Handler(BaseHTTPRequestHandler):
@@ -148,7 +176,7 @@ def main():
             if route == "/":
                 content, content_type = html.read_bytes(), "text/html; charset=utf-8"
             elif route == "/api/state":
-                content = json.dumps(state(args.jobs, args.report, args.total, container, args.profile), ensure_ascii=False).encode("utf-8")
+                content = json.dumps(state(args.jobs, args.report, args.total, container, args.profile, search_container), ensure_ascii=False).encode("utf-8")
                 content_type = "application/json; charset=utf-8"
             else:
                 self.send_error(404)
@@ -174,11 +202,20 @@ def main():
                 self.rfile.read(length)
                 route = urlparse(self.path).path
                 with lock:
-                    if route == "/api/analysis/start":
-                        current = state(args.jobs, args.report, args.total, container, args.profile)
+                    if route == "/api/search/start":
+                        if container_running(container) or container_running(search_container):
+                            raise ValueError("Une recherche ou une analyse est déjà en cours.")
+                        jobs_path.parent.mkdir(parents=True, exist_ok=True)
+                        command = ["docker", "run", "-d", "--rm", "--name", search_container,
+                            "--entrypoint", "python", "-v", f"{project}:/src:ro", "-v", f"{jobs_path.parent}:/jobs",
+                            "seekspider-run", "/src/targeted_search.py", f"/jobs/{jobs_path.name}", "--merge"]
+                        result = subprocess.run(command, capture_output=True, text=True, timeout=30)
+                        if result.returncode:
+                            raise ValueError("Impossible de lancer la recherche. Vérifie Docker et l’image seekspider-run.")
+                    elif route == "/api/analysis/start":
+                        current = state(args.jobs, args.report, args.total, container, args.profile, search_container)
                         if not current["progress"]["can_start"]:
-                            raise ValueError("Démarrage impossible : profil manquant, aucune offre restante ou analyse déjà active.")
-                        project = Path(__file__).resolve().parent
+                            raise ValueError("Démarrage impossible : profil manquant, aucune offre restante ou une tâche est déjà active.")
                         network = ["--network", "container:seekspider-ollama"] if container_running("seekspider-ollama") else []
                         command = ["docker", "run", "-d", "--rm", "--name", container,
                             *network, "--entrypoint", "python",

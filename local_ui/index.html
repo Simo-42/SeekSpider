@@ -416,6 +416,29 @@
       grid-column: 1 / -1;
     }
 
+    .search-panel {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 14px;
+      padding: 12px 18px;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      background: var(--bg-surface);
+    }
+
+    .search-status {
+      flex: 1 1 260px;
+      margin: 0;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      overflow-wrap: anywhere;
+    }
+
+    .search-status.is-error {
+      color: var(--danger-text);
+    }
+
     .progress-panel {
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
@@ -1294,6 +1317,7 @@
       .detail-card {
         padding: 16px;
       }
+      .search-panel .btn,
       .progress-actions {
         width: 100%;
       }
@@ -1360,6 +1384,17 @@
         </div>
         <button type="button" class="btn" id="retry-btn">Réessayer maintenant</button>
       </div>
+
+      <section class="search-panel" aria-label="Recherche sur SEEK">
+        <button type="button" class="btn" id="start-search-btn" aria-describedby="search-task-status" disabled>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="7"></circle>
+            <path d="m20 20-3.5-3.5"></path>
+          </svg>
+          <span>Chercher de nouvelles offres</span>
+        </button>
+        <p class="search-status" id="search-task-status" role="status">Connexion au serveur local…</p>
+      </section>
 
       <section class="progress-panel" aria-labelledby="progress-heading">
         <h2 id="progress-heading" class="sr-only">Progression de l'analyse</h2>
@@ -1535,6 +1570,7 @@
 
       const POLL_INTERVAL_MS = 5000;
       const API_URL = "/api/state";
+      const API_SEARCH_URL = "/api/search/start";
       const API_START_URL = "/api/analysis/start";
       const API_STOP_URL = "/api/analysis/stop";
 
@@ -1554,6 +1590,8 @@
           status: "idle",
           message: ""
         },
+        searchTask: null,
+        searchTaskError: null,
         search: "",
         region: "all",
         analysedOnly: false,
@@ -1562,7 +1600,7 @@
         mobileDetailOpen: false,
         hasLoadedOnce: false,
         isFetching: false,
-        isActionPending: false,
+        pendingAction: null,
         actionError: null,
         lastUpdatedAt: null,
         lastError: null,
@@ -1577,6 +1615,8 @@
         errorBanner: document.getElementById("error-banner"),
         errorBannerText: document.getElementById("error-banner-text"),
         retryBtn: document.getElementById("retry-btn"),
+        startSearchBtn: document.getElementById("start-search-btn"),
+        searchTaskStatus: document.getElementById("search-task-status"),
         progressStatusPill: document.getElementById("progress-status-pill"),
         progressMessage: document.getElementById("progress-message"),
         startAnalysisBtn: document.getElementById("start-analysis-btn"),
@@ -2010,6 +2050,38 @@
         }
       }
 
+      function renderSearchTask() {
+        const task = state.searchTask;
+        const running = task && task.status === "running";
+        const pending = state.pendingAction === API_SEARCH_URL;
+        const analysing = state.progress.status === "running";
+        els.startSearchBtn.disabled = !task || !task.can_start || running || analysing || Boolean(state.pendingAction);
+        els.startSearchBtn.setAttribute("aria-busy", String(Boolean(running || pending)));
+
+        let message = state.hasLoadedOnce ? "Recherche indisponible sur ce serveur." : "Connexion au serveur local…";
+        if (state.searchTaskError) {
+          message = state.searchTaskError;
+        } else if (pending && !running) {
+          message = "Lancement de la recherche sur SEEK…";
+        } else if (task) {
+          const defaults = {
+            idle: analysing ? "Attendez la fin de l’analyse en cours." : "Lancez une recherche sur SEEK.",
+            running: "Recherche sur SEEK en cours.",
+            finished: task.new_jobs === 0 ? "Aucune nouvelle offre trouvée." : "Nouvelles offres ajoutées.",
+            failed: "La recherche sur SEEK a échoué."
+          };
+          message = task.message || defaults[task.status] || defaults.idle;
+          if (running && task.total > 0) {
+            message += " · " + task.completed + " / " + task.total + " recherches";
+          }
+          if (task.status === "finished" && task.new_jobs > 0 && state.progress.can_start) {
+            message += " Pour analyser les offres retenues, cliquez sur « Démarrer ou reprendre ».";
+          }
+        }
+        els.searchTaskStatus.classList.toggle("is-error", Boolean(state.searchTaskError || (task && task.status === "failed")));
+        if (els.searchTaskStatus.textContent !== message) els.searchTaskStatus.textContent = message;
+      }
+
       function renderProgress() {
         const completed = Math.max(0, Number(state.progress.completed) || 0);
         const total = Math.max(0, Number(state.progress.total) || 0);
@@ -2033,12 +2105,13 @@
           els.progressMessage.textContent = completed + " offre(s) traitée(s) sur " + total + ".";
         }
 
-        const disableStart = !state.hasLoadedOnce || state.isActionPending || isRunning || state.progress.can_start === false;
-        const disableStop = !state.hasLoadedOnce || state.isActionPending || !isRunning || state.progress.can_stop === false;
-        els.startAnalysisBtn.disabled = disableStart;
-        els.stopAnalysisBtn.disabled = disableStop;
-        els.startAnalysisBtn.setAttribute("aria-busy", state.isActionPending ? "true" : "false");
-        els.stopAnalysisBtn.setAttribute("aria-busy", state.isActionPending ? "true" : "false");
+        const isSearching = state.searchTask && state.searchTask.status === "running";
+        const disableStart = !state.hasLoadedOnce || state.pendingAction || isRunning || isSearching || state.progress.can_start === false;
+        const disableStop = !state.hasLoadedOnce || state.pendingAction || !isRunning || state.progress.can_stop === false;
+        els.startAnalysisBtn.disabled = Boolean(disableStart);
+        els.stopAnalysisBtn.disabled = Boolean(disableStop);
+        els.startAnalysisBtn.setAttribute("aria-busy", String(state.pendingAction === API_START_URL));
+        els.stopAnalysisBtn.setAttribute("aria-busy", String(state.pendingAction === API_STOP_URL));
 
         if (state.actionError) {
           els.analysisActionErrorText.textContent = state.actionError;
@@ -2606,6 +2679,7 @@
       function renderAll() {
         renderSyncHeader();
         renderErrorBanner();
+        renderSearchTask();
         renderProgress();
         renderFilterCounts();
         const entries = getFilteredAndSortedJobs();
@@ -2692,6 +2766,17 @@
           message: asText(prog.message, "")
         };
 
+        const searchTask = payload.search;
+        state.searchTask = searchTask && typeof searchTask === "object" ? {
+          status: asText(searchTask.status, "idle"),
+          completed: Math.max(0, Math.floor(Number(searchTask.completed) || 0)),
+          total: Math.max(0, Math.floor(Number(searchTask.total) || 0)),
+          new_jobs: Math.max(0, Math.floor(Number(searchTask.new_jobs) || 0)),
+          can_start: searchTask.can_start === true,
+          message: asText(searchTask.message, "")
+        } : null;
+        if (state.searchTask && state.searchTask.status === "running") state.searchTaskError = null;
+
         state.hasLoadedOnce = true;
         state.lastUpdatedAt = new Date();
         state.lastError = null;
@@ -2745,11 +2830,12 @@
         return runFetch;
       }
 
-      async function triggerAnalysisAction(action) {
-        if (state.isActionPending) return;
-        const endpoint = action === "start" ? API_START_URL : API_STOP_URL;
-        state.isActionPending = true;
-        state.actionError = null;
+      async function triggerAction(endpoint) {
+        if (state.pendingAction) return;
+        const errorField = endpoint === API_SEARCH_URL ? "searchTaskError" : "actionError";
+        state.pendingAction = endpoint;
+        state[errorField] = null;
+        renderSearchTask();
         renderProgress();
 
         try {
@@ -2779,11 +2865,15 @@
           }
         } catch (err) {
           const reason = err && err.message ? err.message : "Action impossible sur le serveur local.";
-          state.actionError = reason;
+          state[errorField] = reason;
         } finally {
-          state.isActionPending = false;
-          renderProgress();
-          await fetchState({ force: true });
+          try {
+            await fetchState({ force: true });
+          } finally {
+            state.pendingAction = null;
+            renderSearchTask();
+            renderProgress();
+          }
         }
       }
 
@@ -2796,12 +2886,16 @@
         fetchState({ force: true });
       });
 
+      els.startSearchBtn.addEventListener("click", function () {
+        triggerAction(API_SEARCH_URL);
+      });
+
       els.startAnalysisBtn.addEventListener("click", function () {
-        triggerAnalysisAction("start");
+        triggerAction(API_START_URL);
       });
 
       els.stopAnalysisBtn.addEventListener("click", function () {
-        triggerAnalysisAction("stop");
+        triggerAction(API_STOP_URL);
       });
 
       els.dismissActionErrorBtn.addEventListener("click", function () {
