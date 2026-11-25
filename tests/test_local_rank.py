@@ -18,7 +18,47 @@ def test_deduplicates_and_prioritizes(tmp_path):
             {"job_id": "5", "job_title": "Snr SRE", "area": "Sydney"}]
     path = tmp_path / "jobs.jsonl"
     path.write_text("\n".join(map(json.dumps, jobs)), encoding="utf-8")
-    assert [job["job_id"] for job in rank.select_jobs(path, 20)] == ["2", "1"]
+    assert [job["job_id"] for job in rank.select_jobs(path, 20)] == ["2"]
+
+
+def test_role_families_are_prioritized_and_noise_is_removed(tmp_path):
+    jobs = [{"job_id": "1", "job_title": "MLOps Engineer", "area": "Sydney NSW"},
+            {"job_id": "2", "job_title": "NOC Analyst", "area": "Sydney NSW"},
+            {"job_id": "3", "job_title": "Cloud Operations Engineer", "area": "Perth WA"},
+            {"job_id": "4", "job_title": "Engineer Mining (Mt Holland)", "area": "Perth WA"},
+            {"job_id": "5", "job_title": "Infrastructure Engineer", "area": "Sydney NSW"}]
+    path = tmp_path / "jobs.jsonl"
+    path.write_text("\n".join(map(json.dumps, jobs)), encoding="utf-8")
+    assert [job["job_id"] for job in rank.select_jobs(path, 20)] == ["5", "3", "2", "1"]
+
+
+def test_senior_title_variants_exclude_without_hiding_junior_titles():
+    for title in ("Principal Cloud Engineer", "Staff DevOps Engineer", "Lead SRE", "IT Operations Manager",
+                  "AI Engineers & Engineering Leads", "Operations Support Mgr / IT Support Analyst"):
+        assert rank.is_senior({"job_title": title})
+    for title in ("Junior Cloud Architect", "Level 3 Support Engineer", "Cloud Engineer", "IT Leadership Analyst"):
+        assert not rank.is_senior({"job_title": title})
+
+
+def test_fit_score_is_deterministic_and_rewards_profile_skill_overlap():
+    profile = "AWS Terraform Kubernetes Docker Linux Ansible Python Bash Grafana"
+    job = {"job_title": "Cloud Engineer", "area": "Sydney NSW", "region": "Australia"}
+    strong = rank.calculate_fit_score(job, "AWS Terraform Linux Kubernetes", profile)
+    weak = rank.calculate_fit_score(job, "Customer service and stakeholder communication", profile)
+    assert strong["score_method"] == rank.SCORE_VERSION
+    assert strong["score"] > weak["score"]
+    assert strong["score_role"] == 27 and strong["score_location"] == 10
+    assert strong["score_skills"] == 30
+    assert strong["competences_reperees"] == ["AWS", "Terraform", "Kubernetes", "Linux"]
+    assert strong["score"] == 67
+    assert "mentionne 4 compétences de votre CV" in strong["resume"]
+    assert "Aucune des 8 compétences clés" in weak["resume"]
+
+
+def test_description_keeps_bullet_boundaries_for_experience_filter():
+    description = rank.description_text("<ul><li>Customer experience focus</li><li>5 years warranty</li><li>Minimum 2 years of experience in support</li></ul>")
+    assert "Customer experience focus\n5 years warranty" in description
+    assert rank.experience_exclusion(description) is None
 
 
 def test_rejects_invented_evidence():
@@ -28,16 +68,18 @@ def test_rejects_invented_evidence():
 
         def json(self):
             return {"message": {"content": json.dumps({
-                "score": 70, "resume": "Correct", "points_forts": [], "points_a_verifier": [],
+                "points_forts": [], "points_a_verifier": [],
                 "experience": "3 ans", "preuve_experience": "3 years experience",
                 "visa_sponsoring": "Sponsoring possible", "preuve_visa": "visa sponsorship available"
             })}}
 
     with patch.object(rank.requests, "post", return_value=Response()):
-        result = rank.analyze({}, "Requires 3 years experience.", "profile", "model")
+        result = rank.analyze({"job_title": "Cloud Engineer", "area": "Sydney NSW", "region": "Australia"},
+                              "Requires 3 years experience. AWS, Terraform, Linux.", "AWS Terraform Linux Python", "model")
     assert result["preuve_experience"] == "Requires 3 years experience."
     assert result["preuve_visa"] == "Aucun extrait repéré"
     assert result["visa_sponsoring"] == "Aucune mention repérée automatiquement : vérifie l'annonce."
+    assert result["score_method"] == rank.SCORE_VERSION and result["score"] > 0
 
 
 def test_extracts_citizenship_and_never_invents_sponsorship():
@@ -54,13 +96,27 @@ def test_extracts_negative_and_positive_visa_mentions():
                  "Visa sponsorship is available for eligible applicants.",
                  "Candidates must be eligible to work in Australia.",
                  "Only Australian citizens are eligible.",
-                 "Professionals with NV2 & TSPV clearances are required."):
+                 "Australian permanent residents may apply.",
+                 "Applicants must hold subclass 417 or 482.",
+                 "Applicants must have a valid VEVO check."):
         evidence = rank.extract_evidence(text, rank.VISA_TERMS)
         assert evidence and evidence in text
+    assert "NV2" in rank.extract_evidence("Professionals with NV2 & TSPV clearances are required.", rank.CLEARANCE_TERMS)
+    assert "Baseline" in rank.extract_evidence("Baseline security clearance is required.", rank.CLEARANCE_TERMS)
     assert rank.extract_evidence("Experience with security incident response.", rank.VISA_TERMS) is None
     assert rank.extract_evidence("Accepts Visa and Mastercard. We value corporate citizenship.", rank.VISA_TERMS) is None
     assert rank.extract_evidence("Equal opportunity regardless of race, color, ancestry, religion, sex, citizenship, marital status or disability.", rank.VISA_TERMS) is None
     assert rank.extract_evidence("Only Australian permanent residents may apply.", rank.VISA_TERMS)
+    assert rank.extract_evidence("Baseline response time is 200 ms; submit a PR for review.", rank.CLEARANCE_TERMS) is None
+
+
+def test_work_rights_and_security_clearance_evidence_are_separate():
+    text = "Applicants need full working rights in Australia. NV2 security clearance is required."
+    result = rank.attach_source_evidence({"resume": "NV2 guarantees a visa", "points_forts": [], "points_a_verifier": []}, text)
+    assert "working rights" in result["preuve_visa"]
+    assert "NV2" not in result["preuve_visa"]
+    assert "NV2" in result["preuve_habilitation"]
+    assert "visa" not in result["preuve_habilitation"].lower()
 
 
 def test_finds_evidence_beyond_model_context():
@@ -78,12 +134,17 @@ def test_excludes_clear_five_year_minimum_but_not_ranges_or_optional():
                  "Six years of experience in cloud engineering.",
                  "A minimum of 6.5+ years of experience.",
                  "5+ years in a similar infrastructure role.",
+                 "At least 5 years in DevOps is required.",
                  "5+ years designing, deploying and maintaining secure cloud infrastructure."):
         proof = rank.experience_exclusion(text)
         assert proof and proof in text
     for text in ("3-5 years of experience.", "3 to 5 years of experience.", "three to five years of experience.", "Up to 5 years of experience.",
                  "Less than 5 years of experience.", "5+ years of experience preferred.",
+                 "5+ years of experience would be a bonus.",
+                 "At least 5 years in DevOps would be beneficial.",
+                 "Desirable:\n5+ years of experience in cloud engineering.",
                  "4 years of experience required; 5 years of experience preferred.",
+                 "4 years required, 5 years would be a bonus.",
                  "4.5 years of experience required.",
                  "A 5-year contract with experienced colleagues.",
                  "A five-year warranty on the product.",
@@ -111,6 +172,7 @@ def test_search_targets_all_titles_and_australia():
     search_spec.loader.exec_module(search)
     requests = list(search.TargetedSeek().start_requests())
     assert len(requests) == len(search.TITLES) == 42
+    assert all(rank.is_target_role({"job_title": title}) for title in search.TITLES)
     queries = [parse_qs(urlparse(request.url).query) for request in requests]
     assert all(query["where"] == ["Australia"] for query in queries)
     assert {query["keywords"][0] for query in queries} == set(search.TITLES)
@@ -119,7 +181,7 @@ def test_search_targets_all_titles_and_australia():
 def test_resume_preserves_existing_and_skips_it(tmp_path):
     jobs = tmp_path / "jobs.jsonl"
     report = tmp_path / "report.md"
-    existing = {"offre": {"job_id": "1", "job_title": "Cloud"}, "analyse": {"score": 70, "resume": "OK", "points_forts": [], "points_a_verifier": [], "experience": "non précisé", "preuve_experience": "non précisé", "visa_sponsoring": "non précisé", "preuve_visa": "non précisé"}}
+    existing = {"offre": {"job_id": "1", "job_title": "Cloud"}, "analyse": {"score": 70, "score_method": rank.SCORE_VERSION, "resume": "OK", "points_forts": [], "points_a_verifier": [], "experience": "non précisé", "preuve_experience": "non précisé", "visa_sponsoring": "non précisé", "preuve_visa": "non précisé"}}
     jobs.write_text('\n'.join(json.dumps(job) for job in [existing["offre"], {"job_id": "2", "job_title": "Cloud"}, {"job_id": "3", "job_title": "Senior Cloud"}]), encoding="utf-8")
     report.with_suffix('.json').write_text(json.dumps({"analyses": [existing], "echecs": []}), encoding="utf-8")
     with patch('sys.argv', ['local_rank', str(jobs), str(report), '--resume', '--limit', '1']), \

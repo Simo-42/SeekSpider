@@ -7,7 +7,8 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
-from job_filters import experience_evidence, experience_exclusion, is_senior
+from job_filters import (SCORE_VERSION, experience_evidence, experience_exclusion,
+                         is_senior, is_target_role, role_category)
 
 
 def read_jobs(path, include_senior=False):
@@ -67,6 +68,11 @@ def state(jobs_path, report, total, container, profile=None):
     analyses = read_analyses(report)
     for job_id, analysis in list(analyses.items()):
         updated = dict(analysis)
+        updated["score_obsolete"] = updated.get("score_method") != SCORE_VERSION
+        if updated["score_obsolete"]:
+            updated["score"] = None
+        updated.setdefault("habilitation", "Aucune mention repérée automatiquement : vérifie l'annonce.")
+        updated.setdefault("preuve_habilitation", "Aucun extrait pertinent repéré automatiquement")
         old_experience = updated.get("preuve_experience", "")
         if old_experience and not experience_evidence(old_experience):
             updated["preuve_experience"] = "Aucun extrait pertinent repéré automatiquement"
@@ -87,22 +93,29 @@ def state(jobs_path, report, total, container, profile=None):
         excluded_ids.update(str(row["job"]["job_id"]) for row in saved.get("exclusions", []))
     except (OSError, ValueError, TypeError, KeyError):
         pass
-    jobs = [job for job in all_jobs if not is_senior(job) and str(job["job_id"]) not in excluded_ids]
+    jobs = [job for job in all_jobs if not is_senior(job) and is_target_role(job)
+            and str(job["job_id"]) not in excluded_ids]
+    for job in jobs:
+        job["role_category"] = role_category(job)
     visible_ids = {str(job["job_id"]) for job in jobs}
     analyses = {job_id: analysis for job_id, analysis in analyses.items() if job_id in visible_ids}
     failures = len((failed_ids & visible_ids) - analyses.keys())
-    completed = len(analyses)
+    completed = sum(analysis.get("score_method") == SCORE_VERSION for analysis in analyses.values())
+    stale = len(analyses) - completed
+    pending = len(jobs) - completed
     if running:
         status, message = "running", "Analyse locale en cours"
     elif all_jobs and completed == len(jobs) and not failures:
         status, message = "finished", "Analyse terminée ; consulte les résultats"
     else:
         status = "stopped"
-        message = (f"Analyse en pause : {failures} offre(s) à réessayer" if failures
+        message = (f"Analyse en pause : {stale} score(s) à recalculer, {pending - stale} offre(s) à analyser, {failures} échec(s) à réessayer" if pending or failures
                    else "Analyse en pause ; les résultats enregistrés sont conservés")
     return {"jobs": jobs, "analyses": analyses,
             "progress": {"completed": completed, "total": len(jobs), "status": status, "message": message,
                          "excluded": len(all_jobs) - len(jobs),
+                         "stale": stale,
+                         "pending": pending,
                          "failed": failures,
                          "can_start": bool(profile and profile.is_file() and jobs and not running and completed < len(jobs)),
                          "can_stop": running}}

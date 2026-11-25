@@ -1318,8 +1318,8 @@
         <div class="progress-counters" id="progress-counters">
           <span>Progression : <strong id="counter-progress">0 / 0</strong></span>
           <span>Offres uniques : <strong id="counter-jobs">0</strong></span>
-          <span>Analysées : <strong id="counter-analysed">0</strong></span>
-          <span class="counter-excluded" title="Postes Senior et offres exigeant clairement 5 ans ou plus, après lecture de leur description">Exclus (Senior ou 5 ans et +) : <strong id="counter-excluded">0</strong></span>
+          <span>Scores calculés : <strong id="counter-analysed">0</strong></span>
+          <span class="counter-excluded" title="Postes senior, hors cible, ou exigeant clairement 5 ans ou plus après lecture de la description">Écartées (Senior, 5 ans+ ou hors cible) : <strong id="counter-excluded">0</strong></span>
         </div>
         <div
           class="progress-track"
@@ -1341,8 +1341,8 @@
           <line x1="12" y1="17" x2="12.01" y2="17"></line>
         </svg>
         <div>
-          <strong>Scores indicatifs :</strong> LFM3 attribue souvent des notes identiques ; SEEK peut aussi retourner des métiers hors cible. Vérifiez l'intitulé et l'annonce.
-          <strong>Visa et sponsoring à vérifier</strong> directement sur l'annonce officielle SEEK avant toute candidature.
+          <strong>Score transparent :</strong> calculé à partir de la famille de poste, des compétences repérées dans votre CV et de la ville. LFM3 fournit des pistes de lecture, pas la note. Les postes hors cible sont écartés.
+          <strong>Visa et habilitations restent à vérifier</strong> dans l'annonce officielle SEEK ; aucune éligibilité n'est déduite.
         </div>
       </div>
 
@@ -1392,7 +1392,7 @@
                 <polyline points="20 6 9 17 4 12"></polyline>
               </svg>
             </span>
-            <span>Analysées uniquement</span>
+            <span>Analyses disponibles uniquement</span>
             <span class="seg-count" id="count-analysed-filter">0</span>
           </button>
         </div>
@@ -1626,9 +1626,18 @@
       function normalizeAnalysis(raw) {
         if (!raw || typeof raw !== "object") return null;
         const rawScore = Number(raw.score);
-        const hasScore = Number.isFinite(rawScore) && rawScore >= 0 && rawScore <= 100;
+        const hasScore = raw.score !== null && raw.score !== undefined
+          && raw.score_method === "cv-rules-v1" && Number.isFinite(rawScore) && rawScore >= 0 && rawScore <= 100;
         return {
           score: hasScore ? Math.round(rawScore) : null,
+          score_method: asText(raw.score_method, ""),
+          score_stale: Boolean(raw.score_obsolete) || !hasScore,
+          role_category: asText(raw.role_category, "Famille non classée"),
+          score_role: Number.isFinite(Number(raw.score_role)) ? Number(raw.score_role) : null,
+          score_skills: Number.isFinite(Number(raw.score_skills)) ? Number(raw.score_skills) : null,
+          score_location: Number.isFinite(Number(raw.score_location)) ? Number(raw.score_location) : null,
+          competences_reperees: asStringList(raw.competences_reperees),
+          competences_comparees: Math.max(0, Number(raw.competences_comparees) || 0),
           modele: asText(raw.modele, "Modèle non renseigné"),
           resume: asText(raw.resume, "Non précisé"),
           points_forts: asStringList(raw.points_forts),
@@ -1636,7 +1645,9 @@
           experience: asText(raw.experience, "Non précisé"),
           preuve_experience: asText(raw.preuve_experience, "Non précisé"),
           visa_sponsoring: asText(raw.visa_sponsoring, "Non précisé"),
-          preuve_visa: asText(raw.preuve_visa, "Non précisé")
+          preuve_visa: asText(raw.preuve_visa, "Non précisé"),
+          habilitation: asText(raw.habilitation, "Non précisé"),
+          preuve_habilitation: asText(raw.preuve_habilitation, "Non précisé")
         };
       }
 
@@ -1656,6 +1667,7 @@
             hasExplicitId: Boolean(id),
             job_title: asText(item.job_title, "Intitulé non précisé"),
             business_name: asText(item.business_name, "Entreprise non précisée"),
+            role_category: asText(item.role_category, "Famille non classée"),
             area: asText(item.area, "Localisation non précisée"),
             work_type: asText(item.work_type, ""),
             pay_range: asText(item.pay_range, ""),
@@ -1865,6 +1877,7 @@
         const completed = Math.max(0, Number(state.progress.completed) || 0);
         const total = Math.max(0, Number(state.progress.total) || 0);
         const excluded = Math.max(0, Number(state.progress.excluded) || 0);
+        const stale = Math.max(0, Number(state.progress.stale) || 0);
         const statusLower = asText(state.progress.status, "").toLowerCase();
         const isRunning = statusLower === "running";
         const statusInfo = mapProgressStatus(state.progress.status, completed, total);
@@ -1904,9 +1917,10 @@
 
         let analysedCount = 0;
         for (let i = 0; i < state.jobs.length; i += 1) {
-          if (getAnalysisForJob(state.jobs[i])) analysedCount += 1;
+          const analysis = getAnalysisForJob(state.jobs[i]);
+          if (analysis && analysis.score !== null) analysedCount += 1;
         }
-        els.counterAnalysed.textContent = String(analysedCount);
+        els.counterAnalysed.textContent = String(analysedCount + (stale ? " · " + stale + " à recalculer" : ""));
         els.counterExcluded.textContent = String(excluded);
 
         els.progressBar.setAttribute("aria-valuenow", String(pct));
@@ -2292,12 +2306,14 @@
         scoreLeft.className = "score-big-group";
         const scoreVal = document.createElement("span");
         scoreVal.className = "score-big-value " + getScoreTier(analysis.score);
-        scoreVal.textContent = analysis.score !== null ? (analysis.score + " / 100") : "Score indisponible";
+        scoreVal.textContent = analysis.score !== null ? (analysis.score + " / 100") : (analysis.score_stale ? "À recalculer" : "Score indisponible");
         scoreLeft.appendChild(scoreVal);
 
         const scoreNote = document.createElement("p");
         scoreNote.className = "score-indicative-note";
-        scoreNote.textContent = "Score indicatif local · " + analysis.modele + " — vérifiez toujours l'annonce complète.";
+        scoreNote.textContent = analysis.score !== null
+          ? "Règles locales · LFM3 fournit les pistes de lecture, pas la note."
+          : (analysis.score_stale ? "Ancienne note IA masquée ; démarrez l'analyse pour recalculer." : "Vérifiez toujours l'annonce complète.");
 
         scoreBox.appendChild(scoreLeft);
         scoreBox.appendChild(scoreNote);
@@ -2306,11 +2322,20 @@
         const methodBox = document.createElement("div");
         methodBox.className = "score-method-box";
         const methodH3 = document.createElement("h3");
-        methodH3.textContent = "Méthode du score";
+        methodH3.textContent = analysis.score !== null ? "Détail du score" : "Score à recalculer";
         const methodP = document.createElement("p");
-        methodP.textContent = "Estimation indicative générée par l'IA en comparant l'annonce à votre CV, sans pondération chiffrée fixe. Les points forts et les points à vérifier expliquent cette estimation.";
+        if (analysis.score !== null) {
+          methodP.textContent = "Famille « " + analysis.role_category + " » : " + analysis.score_role + "/30 · compétences clés du CV repérées : " + analysis.competences_reperees.length + "/" + analysis.competences_comparees + " (" + analysis.score_skills + "/60) · localisation : " + analysis.score_location + "/10. Maximum 8 compétences comparées. Le visa, les habilitations et le caractère obligatoire des compétences ne sont pas notés.";
+        } else {
+          methodP.textContent = "Cette ancienne note était générée par le modèle et n'est pas assez fiable. Démarrez l'analyse pour obtenir le score calculé selon vos critères.";
+        }
         methodBox.appendChild(methodH3);
         methodBox.appendChild(methodP);
+        if (analysis.score !== null && analysis.competences_reperees.length) {
+          const skillsP = document.createElement("p");
+          skillsP.textContent = "Repérées dans l'annonce : " + analysis.competences_reperees.join(", ") + ".";
+          methodBox.appendChild(skillsP);
+        }
         section.appendChild(methodBox);
 
         const resumeBlock = document.createElement("div");
@@ -2398,7 +2423,10 @@
           createEvidenceBox("Expérience demandée", analysis.experience, analysis.preuve_experience, false)
         );
         evidenceGrid.appendChild(
-          createEvidenceBox("Visa / sponsoring", analysis.visa_sponsoring, analysis.preuve_visa, true)
+          createEvidenceBox("Visa / droit au travail", analysis.visa_sponsoring, analysis.preuve_visa, true)
+        );
+        evidenceGrid.appendChild(
+          createEvidenceBox("Habilitation de sécurité", analysis.habilitation, analysis.preuve_habilitation, false)
         );
         section.appendChild(evidenceGrid);
 
@@ -2486,6 +2514,7 @@
           completed: Number.isFinite(Number(prog.completed)) ? Number(prog.completed) : 0,
           total: Number.isFinite(Number(prog.total)) ? Number(prog.total) : 0,
           excluded: Number.isFinite(Number(prog.excluded)) ? Math.max(0, Math.floor(Number(prog.excluded))) : 0,
+          stale: Number.isFinite(Number(prog.stale)) ? Math.max(0, Math.floor(Number(prog.stale))) : 0,
           can_start: typeof prog.can_start === "boolean" ? prog.can_start : null,
           can_stop: typeof prog.can_stop === "boolean" ? prog.can_stop : null,
           status: asText(prog.status, "idle"),
