@@ -417,26 +417,86 @@
     }
 
     .search-panel {
-      display: flex;
-      flex-wrap: wrap;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) max-content;
       align-items: center;
-      gap: 8px 14px;
-      padding: 12px 18px;
+      gap: 12px 18px;
+      padding: 14px 18px;
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-lg);
       background: var(--bg-surface);
     }
 
+    .search-panel[data-state="running"] {
+      border-color: var(--border-accent);
+    }
+
+    .search-panel h2 {
+      margin: 0 0 3px;
+      font-size: 0.9375rem;
+    }
+
     .search-status {
-      flex: 1 1 260px;
       margin: 0;
       color: var(--text-secondary);
       font-size: 0.875rem;
       overflow-wrap: anywhere;
     }
 
-    .search-status.is-error {
+    .search-panel[data-state="failed"] .search-status {
       color: var(--danger-text);
+    }
+
+    .search-meter {
+      grid-column: 1 / -1;
+    }
+
+    .search-meter-label {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--text-muted);
+      font-size: 0.8125rem;
+      font-variant-numeric: tabular-nums;
+      margin-bottom: 6px;
+    }
+
+    .search-meter-label strong {
+      color: var(--text-primary);
+      font-weight: 650;
+    }
+
+    .search-track {
+      height: 7px;
+      overflow: hidden;
+      background: var(--bg-inset);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-pill);
+    }
+
+    .search-fill {
+      height: 100%;
+      width: 0;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent-strong), var(--accent));
+      transition: width 240ms ease-out;
+    }
+
+    .search-panel[data-state="finished"] .search-fill {
+      background: var(--success-text);
+    }
+
+    .search-panel[data-state="failed"] .search-fill {
+      background: var(--danger-text);
+    }
+
+    .search-track.is-indeterminate .search-fill {
+      width: 24%;
+      animation: search-scan 1.6s ease-in-out infinite alternate;
+    }
+
+    @keyframes search-scan {
+      to { transform: translateX(315%); }
     }
 
     .progress-panel {
@@ -1317,6 +1377,9 @@
       .detail-card {
         padding: 16px;
       }
+      .search-panel {
+        grid-template-columns: minmax(0, 1fr);
+      }
       .search-panel .btn,
       .progress-actions {
         width: 100%;
@@ -1385,7 +1448,11 @@
         <button type="button" class="btn" id="retry-btn">Réessayer maintenant</button>
       </div>
 
-      <section class="search-panel" aria-label="Recherche sur SEEK">
+      <section class="search-panel" id="search-panel" aria-labelledby="search-task-heading">
+        <div>
+          <h2 id="search-task-heading">Collecte SEEK</h2>
+          <p class="search-status" id="search-task-status" role="status">Connexion au serveur local…</p>
+        </div>
         <button type="button" class="btn" id="start-search-btn" aria-describedby="search-task-status" disabled>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" aria-hidden="true">
             <circle cx="11" cy="11" r="7"></circle>
@@ -1393,7 +1460,15 @@
           </svg>
           <span>Chercher de nouvelles offres</span>
         </button>
-        <p class="search-status" id="search-task-status" role="status">Connexion au serveur local…</p>
+        <div class="search-meter" id="search-meter" hidden>
+          <div class="search-meter-label" aria-hidden="true">
+            <span id="search-meter-count"></span>
+            <strong id="search-meter-percent"></strong>
+          </div>
+          <div class="search-track" id="search-track" role="progressbar" aria-label="Progression de la collecte SEEK">
+            <div class="search-fill" id="search-fill"></div>
+          </div>
+        </div>
       </section>
 
       <section class="progress-panel" aria-labelledby="progress-heading">
@@ -1617,6 +1692,12 @@
         retryBtn: document.getElementById("retry-btn"),
         startSearchBtn: document.getElementById("start-search-btn"),
         searchTaskStatus: document.getElementById("search-task-status"),
+        searchPanel: document.getElementById("search-panel"),
+        searchMeter: document.getElementById("search-meter"),
+        searchMeterCount: document.getElementById("search-meter-count"),
+        searchMeterPercent: document.getElementById("search-meter-percent"),
+        searchTrack: document.getElementById("search-track"),
+        searchFill: document.getElementById("search-fill"),
         progressStatusPill: document.getElementById("progress-status-pill"),
         progressMessage: document.getElementById("progress-message"),
         startAnalysisBtn: document.getElementById("start-analysis-btn"),
@@ -2071,15 +2152,35 @@
             failed: "La recherche sur SEEK a échoué."
           };
           message = task.message || defaults[task.status] || defaults.idle;
-          if (running && task.total > 0) {
-            message += " · " + task.completed + " / " + task.total + " recherches";
-          }
           if (task.status === "finished" && task.new_jobs > 0 && state.progress.can_start) {
             message += " Pour analyser les offres retenues, cliquez sur « Démarrer ou reprendre ».";
           }
         }
-        els.searchTaskStatus.classList.toggle("is-error", Boolean(state.searchTaskError || (task && task.status === "failed")));
-        if (els.searchTaskStatus.textContent !== message) els.searchTaskStatus.textContent = message;
+        const restarting = pending && !running;
+        const phase = state.searchTaskError ? "failed" : restarting ? "running" : task && task.status;
+        const total = !restarting && task ? task.total : 0;
+        const completed = total ? Math.min(task.completed, total) : 0;
+        const percent = total ? Math.round(100 * completed / total) : 0;
+        const showMeter = !state.searchTaskError && (phase === "running" || (total > 0 && phase !== "idle"));
+        if (running && total && completed === total) message = "Enregistrement des offres…";
+        els.searchPanel.dataset.state = phase || "idle";
+        els.searchMeter.hidden = !showMeter;
+        els.searchTrack.classList.toggle("is-indeterminate", showMeter && total === 0);
+        els.searchFill.style.width = total ? percent + "%" : "";
+        els.searchMeterCount.textContent = total ? completed + " / " + total + " recherches" : "Démarrage…";
+        els.searchMeterPercent.textContent = total ? percent + " %" : "";
+        if (total) {
+          els.searchTrack.setAttribute("aria-valuemax", String(total));
+          els.searchTrack.setAttribute("aria-valuenow", String(completed));
+          els.searchTrack.setAttribute("aria-valuetext", completed + " recherches sur " + total);
+        } else {
+          for (const attr of ["aria-valuemax", "aria-valuenow", "aria-valuetext"]) {
+            els.searchTrack.removeAttribute(attr);
+          }
+        }
+        if (els.searchTaskStatus.textContent !== message) {
+          els.searchTaskStatus.textContent = message;
+        }
       }
 
       function renderProgress() {
