@@ -12,7 +12,10 @@ spec.loader.exec_module(rank)
 def test_deduplicates_and_prioritizes(tmp_path):
     jobs = [{"job_id": "1", "job_title": "Other", "area": "Perth"},
             {"job_id": "2", "job_title": "Infrastructure Engineer", "area": "Sydney"},
-            {"job_id": "2", "job_title": "Duplicate", "area": "Sydney"}]
+            {"job_id": "2", "job_title": "Duplicate", "area": "Sydney"},
+            {"job_id": "3", "job_title": "SENIOR Cloud Engineer", "area": "Sydney"},
+            {"job_id": "4", "job_title": "Sr. DevOps Engineer", "area": "Sydney"},
+            {"job_id": "5", "job_title": "Snr SRE", "area": "Sydney"}]
     path = tmp_path / "jobs.jsonl"
     path.write_text("\n".join(map(json.dumps, jobs)), encoding="utf-8")
     assert [job["job_id"] for job in rank.select_jobs(path, 20)] == ["2", "1"]

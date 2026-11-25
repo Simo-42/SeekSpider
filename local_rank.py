@@ -7,6 +7,7 @@ from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
+from job_filters import is_senior
 
 
 spec = importlib.util.spec_from_file_location(
@@ -26,7 +27,8 @@ def select_jobs(path, limit):
     for line in path.read_text(encoding="utf-8").splitlines():
         if line.strip():
             job = json.loads(line)
-            unique.setdefault(str(job["job_id"]), job)
+            if not is_senior(job):
+                unique.setdefault(str(job["job_id"]), job)
     def key(job):
         title, area = job.get("job_title", "").lower(), job.get("area", "").lower()
         return (not any(word in title for word in PRIORITY),

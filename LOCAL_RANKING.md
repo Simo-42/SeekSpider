@@ -16,7 +16,7 @@ docker run --rm --network container:seekspider-ollama --entrypoint python \
   seekspider-run /src/local_rank.py /results/offres.jsonl /results/analyse.md --limit 20
 ```
 
-La recherche parcourt les 42 intitulés Cloud, infrastructure, support et IA sur toute l'Australie, à raison d'une première page par intitulé. Les résultats SEEK peuvent contenir des postes voisins ; aucun filtre d'expérience, de visa ou de contrat n'est garanti par la recherche. Le classement dédoublonne les annonces et examine les descriptions de l'échantillon.
+La recherche parcourt les 42 intitulés Cloud, infrastructure, support et IA sur toute l'Australie, à raison d'une première page par intitulé. Les résultats SEEK peuvent contenir des postes voisins ; aucun filtre d'expérience, de visa ou de contrat n'est garanti par la recherche. Le classement dédoublonne les annonces, exclut les intitulés contenant « Senior », « Sr » ou « Snr » et examine les descriptions de l'échantillon. L'interface applique le même filtre ; les données brutes sont conservées.
 
 Pour utiliser un CV texte UTF-8 local, placer le fichier dans le dossier monté et ajouter `--profile /results/cv.txt`. Sans CV, le profil provisoire décrit dans le script est utilisé. Le dossier de résultats peut contenir des données personnelles : ne pas le publier. La récupération des offres passe par SEEK ; le CV et l'analyse sont envoyés uniquement au serveur Ollama sur `127.0.0.1` dans le réseau du conteneur. Le serveur est publié sur l'interface locale uniquement.
 

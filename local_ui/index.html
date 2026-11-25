@@ -1,0 +1,2404 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SeekSpider — Suivi local des offres Australie</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg-canvas: #0a0e17;
+      --bg-toolbar: #0f1624;
+      --bg-surface: #121b2c;
+      --bg-surface-hover: #182338;
+      --bg-surface-active: #17273d;
+      --bg-inset: #0c121e;
+
+      --border-subtle: rgba(148, 163, 184, 0.16);
+      --border-strong: rgba(148, 163, 184, 0.3);
+      --border-accent: rgba(34, 211, 238, 0.55);
+
+      --text-primary: #f1f5f9;
+      --text-secondary: #cbd5e1;
+      --text-muted: #94a3b8;
+
+      --accent: #22d3ee;
+      --accent-strong: #06b6d4;
+      --accent-bg: rgba(34, 211, 238, 0.12);
+      --accent-btn-bg: #0e7490;
+      --accent-btn-hover: #0891b2;
+      --accent-btn-text: #ffffff;
+
+      --success-text: #34d399;
+      --success-bg: rgba(16, 185, 129, 0.13);
+      --success-border: rgba(52, 211, 153, 0.34);
+
+      --warning-text: #fbbf24;
+      --warning-bg: rgba(245, 158, 11, 0.13);
+      --warning-border: rgba(251, 191, 36, 0.34);
+
+      --danger-text: #fca5a5;
+      --danger-bg: rgba(239, 68, 68, 0.14);
+      --danger-border: rgba(248, 113, 113, 0.38);
+
+      --neutral-badge-text: #cbd5e1;
+      --neutral-badge-bg: rgba(148, 163, 184, 0.12);
+      --neutral-badge-border: rgba(148, 163, 184, 0.28);
+
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --radius-pill: 9999px;
+
+      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+
+      --transition-fast: 160ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    ::selection {
+      background: rgba(34, 211, 238, 0.28);
+      color: #f8fafc;
+    }
+
+    html {
+      font-size: 16px;
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--font-sans);
+      font-size: 0.9375rem;
+      line-height: 1.5;
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      caret-color: var(--accent);
+    }
+
+    /* Scrollbars */
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: #334155 transparent;
+    }
+    *::-webkit-scrollbar {
+      width: 7px;
+      height: 7px;
+    }
+    *::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    *::-webkit-scrollbar-thumb {
+      background-color: #334155;
+      border-radius: var(--radius-pill);
+    }
+    *::-webkit-scrollbar-thumb:hover {
+      background-color: #475569;
+    }
+
+    /* Focus visibility */
+    :focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .skip-link {
+      position: absolute;
+      top: -100px;
+      left: 16px;
+      z-index: 100;
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      background: var(--accent-btn-bg);
+      color: var(--accent-btn-text);
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .skip-link:focus {
+      top: 12px;
+    }
+
+    /* App Shell */
+    .app-shell {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      background: rgba(15, 22, 36, 0.92);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .topbar-inner {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 14px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px 20px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      flex-shrink: 0;
+      border-radius: var(--radius-md);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-strong);
+      display: grid;
+      place-items: center;
+      color: var(--accent);
+    }
+
+    .brand-text h1 {
+      margin: 0;
+      font-size: 1.125rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.25;
+      color: var(--text-primary);
+    }
+
+    .brand-subtitle {
+      margin: 0;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+    }
+
+    .topbar-status {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .sync-meta {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.8125rem;
+      color: var(--text-secondary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: var(--radius-pill);
+      background: var(--text-muted);
+      flex-shrink: 0;
+    }
+    .status-dot.is-running {
+      background: var(--accent);
+      animation: pulse-dot 1.8s ease-in-out infinite;
+    }
+    .status-dot.is-done {
+      background: var(--success-text);
+    }
+    .status-dot.is-error {
+      background: var(--danger-text);
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.35; }
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      min-height: 36px;
+      padding: 7px 13px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-strong);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 500;
+      line-height: 1.2;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+    }
+    .btn:hover:not(:disabled) {
+      background: var(--bg-surface-hover);
+      border-color: var(--border-accent);
+    }
+    .btn:active:not(:disabled) {
+      background: var(--bg-surface-active);
+    }
+    .btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: var(--accent-btn-bg);
+      border-color: rgba(34, 211, 238, 0.35);
+      color: var(--accent-btn-text);
+      font-weight: 600;
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: var(--accent-btn-hover);
+      border-color: var(--accent);
+    }
+
+    .btn-quiet {
+      background: transparent;
+      border-color: var(--border-subtle);
+      color: var(--text-secondary);
+    }
+    .btn-quiet:hover:not(:disabled) {
+      color: var(--text-primary);
+      background: var(--bg-surface);
+    }
+
+    /* Main Container */
+    .main-wrap {
+      width: 100%;
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 18px 20px 32px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      flex: 1;
+    }
+
+    /* Banners & Progress */
+    .alert-banner {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--danger-border);
+      background: var(--danger-bg);
+      color: var(--danger-text);
+      font-size: 0.875rem;
+    }
+    .alert-banner[hidden] {
+      display: none;
+    }
+    .alert-banner-content {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .notice-bar {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 14px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--warning-border);
+      background: var(--warning-bg);
+      color: var(--text-primary);
+      font-size: 0.84375rem;
+      line-height: 1.45;
+    }
+    .notice-bar svg {
+      color: var(--warning-text);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .notice-bar strong {
+      color: var(--warning-text);
+      font-weight: 600;
+    }
+
+    .progress-panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .progress-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px 18px;
+    }
+
+    .progress-status-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: var(--radius-pill);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      border: 1px solid var(--neutral-badge-border);
+      background: var(--neutral-badge-bg);
+      color: var(--neutral-badge-text);
+    }
+    .status-pill.is-running {
+      color: var(--accent);
+      background: var(--accent-bg);
+      border-color: var(--border-accent);
+    }
+    .status-pill.is-done {
+      color: var(--success-text);
+      background: var(--success-bg);
+      border-color: var(--success-border);
+    }
+    .status-pill.is-error {
+      color: var(--danger-text);
+      background: var(--danger-bg);
+      border-color: var(--danger-border);
+    }
+
+    .progress-message {
+      margin: 0;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      overflow-wrap: anywhere;
+    }
+
+    .progress-counters {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 16px;
+      font-size: 0.84375rem;
+      color: var(--text-secondary);
+      font-variant-numeric: tabular-nums;
+    }
+    .progress-counters strong {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .progress-track {
+      width: 100%;
+      height: 8px;
+      border-radius: var(--radius-pill);
+      background: var(--bg-inset);
+      border: 1px solid var(--border-subtle);
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: var(--radius-pill);
+      background: var(--accent-strong);
+      transition: width 260ms cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .progress-fill.is-done {
+      background: var(--success-text);
+    }
+    .progress-fill.is-error {
+      background: var(--danger-text);
+    }
+
+    /* Controls Toolbar */
+    .controls-panel {
+      background: var(--bg-toolbar);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 14px 16px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 12px 16px;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .control-group.search-group {
+      flex: 1 1 260px;
+      min-width: 220px;
+    }
+
+    .control-label {
+      font-size: 0.78125rem;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .search-field {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 11px;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .text-input,
+    .select-input {
+      width: 100%;
+      min-height: 38px;
+      padding: 7px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-strong);
+      background: var(--bg-inset);
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 0.875rem;
+      transition: border-color var(--transition-fast), background-color var(--transition-fast);
+    }
+    .text-input:hover,
+    .select-input:hover {
+      border-color: rgba(148, 163, 184, 0.48);
+    }
+    .text-input:focus,
+    .select-input:focus {
+      border-color: var(--accent);
+    }
+
+    .search-field .text-input {
+      padding-left: 34px;
+      padding-right: 70px;
+    }
+
+    .clear-search-btn {
+      position: absolute;
+      right: 6px;
+      min-height: 26px;
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 0.78125rem;
+      cursor: pointer;
+    }
+    .clear-search-btn:hover {
+      color: var(--text-primary);
+      background: var(--bg-surface-hover);
+    }
+    .clear-search-btn[hidden] {
+      display: none;
+    }
+
+    .segmented-group {
+      display: inline-flex;
+      flex-wrap: wrap;
+      background: var(--bg-inset);
+      border: 1px solid var(--border-strong);
+      border-radius: var(--radius-sm);
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .seg-btn {
+      min-height: 32px;
+      padding: 5px 11px;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-family: inherit;
+      font-size: 0.84375rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-variant-numeric: tabular-nums;
+      transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+    }
+    .seg-btn:hover {
+      color: var(--text-primary);
+      background: var(--bg-surface);
+    }
+    .seg-btn[aria-pressed="true"] {
+      background: var(--accent-bg);
+      color: var(--accent);
+      border-color: var(--border-accent);
+      font-weight: 600;
+    }
+
+    .seg-count {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .seg-btn[aria-pressed="true"] .seg-count {
+      color: var(--text-primary);
+    }
+
+    .toggle-btn {
+      min-height: 38px;
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-strong);
+      background: var(--bg-inset);
+      color: var(--text-secondary);
+      font-family: inherit;
+      font-size: 0.84375rem;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-variant-numeric: tabular-nums;
+      transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+    }
+    .toggle-btn:hover {
+      color: var(--text-primary);
+      border-color: rgba(148, 163, 184, 0.48);
+    }
+    .toggle-btn[aria-pressed="true"] {
+      background: var(--accent-bg);
+      border-color: var(--border-accent);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .toggle-check {
+      width: 15px;
+      height: 15px;
+      border-radius: 4px;
+      border: 1px solid var(--border-strong);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    .toggle-btn[aria-pressed="true"] .toggle-check {
+      border-color: var(--accent);
+      background: var(--accent);
+      color: #082026;
+    }
+
+    /* Workspace Master-Detail */
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(340px, 44%) minmax(0, 56%);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .list-column {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .list-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 2px;
+    }
+
+    .list-header h2 {
+      margin: 0;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .jobs-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .job-item-btn {
+      width: 100%;
+      text-align: left;
+      padding: 14px 15px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      font-family: inherit;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: background-color var(--transition-fast), border-color var(--transition-fast);
+    }
+    .job-item-btn:hover {
+      background: var(--bg-surface-hover);
+      border-color: var(--border-strong);
+    }
+    .job-item-btn[aria-current="true"] {
+      background: var(--bg-surface-active);
+      border-color: var(--border-accent);
+    }
+
+    .job-row-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .job-title {
+      margin: 0;
+      font-size: 0.96875rem;
+      font-weight: 600;
+      line-height: 1.35;
+      color: var(--text-primary);
+      overflow-wrap: anywhere;
+    }
+
+    .job-company {
+      margin: 0;
+      font-size: 0.84375rem;
+      color: var(--text-secondary);
+      overflow-wrap: anywhere;
+    }
+
+    .job-meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px 12px;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .meta-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .job-snippet {
+      margin: 0;
+      font-size: 0.84375rem;
+      color: var(--text-secondary);
+      line-height: 1.45;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* Score Badges */
+    .score-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      flex-shrink: 0;
+      padding: 3px 9px;
+      border-radius: var(--radius-pill);
+      font-size: 0.8125rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      border: 1px solid var(--neutral-badge-border);
+      background: var(--neutral-badge-bg);
+      color: var(--neutral-badge-text);
+    }
+    .score-badge.score-high {
+      color: var(--success-text);
+      background: var(--success-bg);
+      border-color: var(--success-border);
+    }
+    .score-badge.score-mid {
+      color: var(--warning-text);
+      background: var(--warning-bg);
+      border-color: var(--warning-border);
+    }
+    .score-badge.score-low {
+      color: var(--danger-text);
+      background: var(--danger-bg);
+      border-color: var(--danger-border);
+    }
+    .score-badge.score-pending {
+      font-weight: 500;
+      color: var(--text-muted);
+      background: var(--bg-inset);
+      border-color: var(--border-subtle);
+    }
+
+    /* Detail Pane */
+    .detail-column {
+      position: sticky;
+      top: 84px;
+      min-width: 0;
+    }
+
+    .detail-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 20px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      max-height: calc(100vh - 108px);
+      overflow-y: auto;
+    }
+
+    .mobile-back-row {
+      display: none;
+    }
+
+    .detail-head {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .detail-title-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .detail-title {
+      margin: 0;
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.3;
+      color: var(--text-primary);
+      overflow-wrap: anywhere;
+    }
+
+    .detail-company {
+      margin: 0;
+      font-size: 0.9375rem;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .detail-facts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      font-size: 0.84375rem;
+      color: var(--text-secondary);
+      font-variant-numeric: tabular-nums;
+    }
+    .detail-facts li {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .detail-id {
+      font-family: var(--font-mono);
+      font-size: 0.78125rem;
+      color: var(--text-muted);
+    }
+
+    .detail-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      margin-top: 2px;
+    }
+
+    .link-unavailable {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.84375rem;
+      color: var(--text-muted);
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px dashed var(--border-strong);
+      background: var(--bg-inset);
+    }
+
+    .analysis-section {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .score-summary-box {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: var(--radius-md);
+      background: var(--bg-inset);
+      border: 1px solid var(--border-subtle);
+    }
+
+    .score-big-group {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .score-big-value {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1;
+    }
+    .score-big-value.score-high { color: var(--success-text); }
+    .score-big-value.score-mid { color: var(--warning-text); }
+    .score-big-value.score-low { color: var(--danger-text); }
+
+    .score-indicative-note {
+      margin: 0;
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+    }
+
+    .detail-block {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .detail-block h3 {
+      margin: 0;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .detail-prose {
+      margin: 0;
+      max-width: 68ch;
+      font-size: 0.9375rem;
+      line-height: 1.55;
+      color: var(--text-secondary);
+      overflow-wrap: anywhere;
+    }
+
+    .bullet-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .bullet-box {
+      padding: 14px;
+      border-radius: var(--radius-md);
+      background: var(--bg-inset);
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .bullet-box h3 {
+      margin: 0;
+      font-size: 0.84375rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .bullet-box.is-strengths h3 { color: var(--success-text); }
+    .bullet-box.is-checks h3 { color: var(--warning-text); }
+
+    .bullet-list {
+      margin: 0;
+      padding-left: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      overflow-wrap: anywhere;
+    }
+
+    .evidence-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .evidence-box {
+      padding: 14px;
+      border-radius: var(--radius-md);
+      background: var(--bg-inset);
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .evidence-box.is-visa {
+      border-color: var(--warning-border);
+    }
+
+    .evidence-box h3 {
+      margin: 0;
+      font-size: 0.84375rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .evidence-value {
+      margin: 0;
+      font-size: 0.875rem;
+      color: var(--text-primary);
+      font-weight: 500;
+      overflow-wrap: anywhere;
+    }
+
+    .evidence-quote {
+      margin: 0;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      background: rgba(148, 163, 184, 0.07);
+      border: 1px solid var(--border-subtle);
+      font-size: 0.8125rem;
+      color: var(--text-secondary);
+      line-height: 1.45;
+      overflow-wrap: anywhere;
+    }
+
+    .visa-disclaimer {
+      margin: 2px 0 0;
+      font-size: 0.78125rem;
+      color: var(--warning-text);
+    }
+
+    /* Empty & Skeleton States */
+    .state-box {
+      padding: 28px 20px;
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-surface);
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .state-box h3 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .state-box p {
+      margin: 0;
+      max-width: 48ch;
+      font-size: 0.875rem;
+      color: var(--text-muted);
+    }
+
+    .skeleton-item {
+      padding: 15px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-surface);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .skeleton-line {
+      height: 12px;
+      border-radius: 4px;
+      background: rgba(148, 163, 184, 0.14);
+    }
+    .skeleton-line.w-70 { width: 70%; height: 15px; }
+    .skeleton-line.w-45 { width: 45%; }
+    .skeleton-line.w-90 { width: 90%; }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .workspace {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .detail-column {
+        position: static;
+      }
+      .detail-card {
+        max-height: none;
+      }
+      .workspace.mobile-detail-open .list-column {
+        display: none;
+      }
+      .workspace:not(.mobile-detail-open) .detail-column {
+        display: none;
+      }
+      .workspace.mobile-detail-open .mobile-back-row {
+        display: flex;
+      }
+    }
+
+    @media (max-width: 680px) {
+      .topbar-inner,
+      .main-wrap {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+      .bullet-grid,
+      .evidence-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .detail-card {
+        padding: 16px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="7"></circle>
+              <path d="m20 20-3.5-3.5"></path>
+              <path d="M11 8v6"></path>
+              <path d="M8 11h6"></path>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <h1>SeekSpider — Offres Australie</h1>
+            <p class="brand-subtitle">Consultation locale des annonces SEEK et analyses indicatives</p>
+          </div>
+        </div>
+
+        <div class="topbar-status">
+          <div class="sync-meta" aria-live="polite" id="sync-meta">
+            <span class="status-dot" id="sync-dot" aria-hidden="true"></span>
+            <span id="sync-text">Connexion à /api/state…</span>
+          </div>
+          <button type="button" class="btn" id="refresh-btn">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 12a9 9 0 1 1-2.64-6.36"></path>
+              <polyline points="21 3 21 9 15 9"></polyline>
+            </svg>
+            <span>Actualiser</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main id="main-content" class="main-wrap">
+      <div id="error-banner" class="alert-banner" role="alert" hidden>
+        <div class="alert-banner-content">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span id="error-banner-text"></span>
+        </div>
+        <button type="button" class="btn" id="retry-btn">Réessayer maintenant</button>
+      </div>
+
+      <section class="progress-panel" aria-labelledby="progress-heading">
+        <h2 id="progress-heading" class="sr-only">Progression de l'analyse</h2>
+        <div class="progress-header">
+          <div class="progress-status-group">
+            <span class="status-pill" id="progress-status-pill">Initialisation</span>
+            <p class="progress-message" id="progress-message" aria-live="polite">En attente des données locales…</p>
+          </div>
+          <div class="progress-counters" id="progress-counters">
+            <span>Progression : <strong id="counter-progress">0 / 0</strong></span>
+            <span>Offres uniques : <strong id="counter-jobs">0</strong></span>
+            <span>Analysées : <strong id="counter-analysed">0</strong></span>
+          </div>
+        </div>
+        <div
+          class="progress-track"
+          role="progressbar"
+          id="progress-bar"
+          aria-label="Progression des analyses"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+        >
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+      </section>
+
+      <div class="notice-bar" role="note">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"></path>
+          <line x1="12" y1="9" x2="12" y2="13"></line>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+        <div>
+          <strong>Scores indicatifs :</strong> les évaluations servent uniquement à prioriser la lecture.
+          <strong>Visa et sponsoring à vérifier</strong> directement sur l'annonce officielle SEEK avant toute candidature.
+        </div>
+      </div>
+
+      <section class="controls-panel" aria-label="Recherche, filtres et tri">
+        <div class="control-group search-group">
+          <label for="search-input" class="control-label">Rechercher</label>
+          <div class="search-field">
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input
+              type="search"
+              id="search-input"
+              class="text-input"
+              placeholder="Intitulé, entreprise, ville, résumé…"
+              autocomplete="off"
+              spellcheck="false"
+            >
+            <button type="button" id="clear-search-btn" class="clear-search-btn" hidden>Effacer</button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <span class="control-label" id="region-label">Zone</span>
+          <div class="segmented-group" role="group" aria-labelledby="region-label">
+            <button type="button" class="seg-btn" data-region="all" aria-pressed="true">
+              <span>Australie</span>
+              <span class="seg-count" id="count-region-all">0</span>
+            </button>
+            <button type="button" class="seg-btn" data-region="sydney" aria-pressed="false">
+              <span>Sydney</span>
+              <span class="seg-count" id="count-region-sydney">0</span>
+            </button>
+            <button type="button" class="seg-btn" data-region="melbourne" aria-pressed="false">
+              <span>Melbourne</span>
+              <span class="seg-count" id="count-region-melbourne">0</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <span class="control-label">Analyse</span>
+          <button type="button" class="toggle-btn" id="analysed-only-btn" aria-pressed="false">
+            <span class="toggle-check" aria-hidden="true">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </span>
+            <span>Analysées uniquement</span>
+            <span class="seg-count" id="count-analysed-filter">0</span>
+          </button>
+        </div>
+
+        <div class="control-group">
+          <label for="sort-select" class="control-label">Trier par</label>
+          <select id="sort-select" class="select-input">
+            <option value="score">Meilleur score</option>
+            <option value="recent">Récence</option>
+          </select>
+        </div>
+      </section>
+
+      <div class="workspace" id="workspace">
+        <section class="list-column" aria-labelledby="list-heading">
+          <div class="list-header">
+            <h2 id="list-heading" aria-live="polite">Chargement des offres…</h2>
+            <button type="button" class="btn btn-quiet" id="reset-filters-btn" hidden>Réinitialiser les filtres</button>
+          </div>
+
+          <div id="list-container">
+            <div class="skeleton-item" aria-hidden="true">
+              <div class="skeleton-line w-70"></div>
+              <div class="skeleton-line w-45"></div>
+              <div class="skeleton-line w-90"></div>
+            </div>
+            <div class="skeleton-item" aria-hidden="true">
+              <div class="skeleton-line w-70"></div>
+              <div class="skeleton-line w-45"></div>
+              <div class="skeleton-line w-90"></div>
+            </div>
+            <div class="skeleton-item" aria-hidden="true">
+              <div class="skeleton-line w-70"></div>
+              <div class="skeleton-line w-45"></div>
+              <div class="skeleton-line w-90"></div>
+            </div>
+          </div>
+        </section>
+
+        <aside class="detail-column" aria-label="Détails de l'offre sélectionnée">
+          <div class="detail-card" id="detail-panel" tabindex="-1">
+            <div class="state-box">
+              <h3>Sélectionnez une offre</h3>
+              <p>Choisissez une annonce dans la liste pour consulter les détails disponibles et son analyse indicative.</p>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      const POLL_INTERVAL_MS = 5000;
+      const API_URL = "/api/state";
+
+      const state = {
+        jobs: [],
+        rawJobsCount: 0,
+        analyses: Object.create(null),
+        progress: { completed: 0, total: 0, status: "idle", message: "" },
+        search: "",
+        region: "all",
+        analysedOnly: false,
+        sort: "score",
+        selectedId: null,
+        mobileDetailOpen: false,
+        hasLoadedOnce: false,
+        isFetching: false,
+        lastUpdatedAt: null,
+        lastError: null,
+        pollTimer: null,
+        lastDetailSignature: ""
+      };
+
+      const els = {
+        syncDot: document.getElementById("sync-dot"),
+        syncText: document.getElementById("sync-text"),
+        refreshBtn: document.getElementById("refresh-btn"),
+        errorBanner: document.getElementById("error-banner"),
+        errorBannerText: document.getElementById("error-banner-text"),
+        retryBtn: document.getElementById("retry-btn"),
+        progressStatusPill: document.getElementById("progress-status-pill"),
+        progressMessage: document.getElementById("progress-message"),
+        counterProgress: document.getElementById("counter-progress"),
+        counterJobs: document.getElementById("counter-jobs"),
+        counterAnalysed: document.getElementById("counter-analysed"),
+        progressBar: document.getElementById("progress-bar"),
+        progressFill: document.getElementById("progress-fill"),
+        searchInput: document.getElementById("search-input"),
+        clearSearchBtn: document.getElementById("clear-search-btn"),
+        regionBtns: Array.from(document.querySelectorAll("[data-region]")),
+        countRegionAll: document.getElementById("count-region-all"),
+        countRegionSydney: document.getElementById("count-region-sydney"),
+        countRegionMelbourne: document.getElementById("count-region-melbourne"),
+        analysedOnlyBtn: document.getElementById("analysed-only-btn"),
+        countAnalysedFilter: document.getElementById("count-analysed-filter"),
+        sortSelect: document.getElementById("sort-select"),
+        workspace: document.getElementById("workspace"),
+        listHeading: document.getElementById("list-heading"),
+        resetFiltersBtn: document.getElementById("reset-filters-btn"),
+        listContainer: document.getElementById("list-container"),
+        detailPanel: document.getElementById("detail-panel")
+      };
+
+      function asText(value, fallback) {
+        if (typeof value === "string") {
+          const trimmed = value.trim();
+          return trimmed.length > 0 ? trimmed : (fallback || "");
+        }
+        if (typeof value === "number" && Number.isFinite(value)) {
+          return String(value);
+        }
+        return fallback || "";
+      }
+
+      function asStringList(value) {
+        if (!Array.isArray(value)) return [];
+        const out = [];
+        for (let i = 0; i < value.length; i += 1) {
+          const item = asText(value[i], "");
+          if (item) out.push(item);
+        }
+        return out;
+      }
+
+      function getSafeSeekUrl(rawUrl) {
+        if (typeof rawUrl !== "string") return null;
+        const trimmed = rawUrl.trim();
+        if (!trimmed) return null;
+        try {
+          const parsed = new URL(trimmed);
+          if (parsed.protocol !== "https:") return null;
+          if (parsed.username || parsed.password) return null;
+          const host = parsed.hostname.toLowerCase();
+          if (host === "seek.com.au" || host.endsWith(".seek.com.au")) {
+            return parsed.href;
+          }
+          return null;
+        } catch (_err) {
+          return null;
+        }
+      }
+
+      function parsePostedTimestamp(rawDate) {
+        const text = asText(rawDate, "");
+        if (!text) return null;
+
+        const direct = Date.parse(text);
+        if (!Number.isNaN(direct)) {
+          return direct;
+        }
+
+        const lower = text.toLowerCase();
+        const now = Date.now();
+        if (lower.includes("today") || lower.includes("aujourd") || lower.includes("just now")) {
+          return now;
+        }
+        if (lower.includes("yesterday") || lower.includes("hier")) {
+          return now - 86400000;
+        }
+
+        const relMatch = lower.match(/(\d+)\s*(m|min|h|hr|hour|d|day|j|w|week|sem|mo|month)/);
+        if (relMatch) {
+          const amount = Number(relMatch[1]);
+          const unit = relMatch[2];
+          if (Number.isFinite(amount)) {
+            if (unit === "m" || unit === "min") return now - amount * 60000;
+            if (unit === "h" || unit === "hr" || unit === "hour") return now - amount * 3600000;
+            if (unit === "d" || unit === "day" || unit === "j") return now - amount * 86400000;
+            if (unit === "w" || unit === "week" || unit === "sem") return now - amount * 7 * 86400000;
+            if (unit === "mo" || unit === "month") return now - amount * 30 * 86400000;
+          }
+        }
+        return null;
+      }
+
+      function formatPostedDate(rawDate) {
+        const text = asText(rawDate, "");
+        if (!text) return "Date non précisée";
+        const parsed = Date.parse(text);
+        if (!Number.isNaN(parsed) && /^\d{4}-\d{2}-\d{2}/.test(text)) {
+          try {
+            return new Intl.DateTimeFormat("fr-FR", {
+              day: "numeric",
+              month: "short",
+              year: "numeric"
+            }).format(new Date(parsed));
+          } catch (_err) {
+            return text;
+          }
+        }
+        return text;
+      }
+
+      function formatTime(dateObj) {
+        if (!dateObj) return "";
+        try {
+          return new Intl.DateTimeFormat("fr-FR", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit"
+          }).format(dateObj);
+        } catch (_err) {
+          return "";
+        }
+      }
+
+      function normalizeAnalysis(raw) {
+        if (!raw || typeof raw !== "object") return null;
+        const rawScore = Number(raw.score);
+        const hasScore = Number.isFinite(rawScore) && rawScore >= 0 && rawScore <= 100;
+        return {
+          score: hasScore ? Math.round(rawScore) : null,
+          resume: asText(raw.resume, "Non précisé"),
+          points_forts: asStringList(raw.points_forts),
+          points_a_verifier: asStringList(raw.points_a_verifier),
+          experience: asText(raw.experience, "Non précisé"),
+          preuve_experience: asText(raw.preuve_experience, "Non précisé"),
+          visa_sponsoring: asText(raw.visa_sponsoring, "Non précisé"),
+          preuve_visa: asText(raw.preuve_visa, "Non précisé")
+        };
+      }
+
+      function deduplicateJobs(rawJobs) {
+        if (!Array.isArray(rawJobs)) return [];
+        const seen = new Map();
+        for (let i = 0; i < rawJobs.length; i += 1) {
+          const item = rawJobs[i];
+          if (!item || typeof item !== "object") continue;
+          const id = asText(item.job_id, "");
+          const safeUrl = getSafeSeekUrl(item.url);
+          const dedupeKey = id || safeUrl || ("row-" + i + "-" + asText(item.job_title, "") + "-" + asText(item.business_name, ""));
+          if (seen.has(dedupeKey)) continue;
+
+          seen.set(dedupeKey, {
+            id: id || dedupeKey,
+            hasExplicitId: Boolean(id),
+            job_title: asText(item.job_title, "Intitulé non précisé"),
+            business_name: asText(item.business_name, "Entreprise non précisée"),
+            area: asText(item.area, "Localisation non précisée"),
+            work_type: asText(item.work_type, ""),
+            pay_range: asText(item.pay_range, ""),
+            safeUrl: safeUrl,
+            posted_date: asText(item.posted_date, ""),
+            postedTs: parsePostedTimestamp(item.posted_date),
+            orderIndex: i
+          });
+        }
+        return Array.from(seen.values());
+      }
+
+      function getAnalysisForJob(job) {
+        if (!job) return null;
+        return Object.prototype.hasOwnProperty.call(state.analyses, job.id)
+          ? state.analyses[job.id]
+          : null;
+      }
+
+      function getScoreTier(score) {
+        if (score === null || score === undefined) return "score-pending";
+        if (score >= 75) return "score-high";
+        if (score >= 50) return "score-mid";
+        return "score-low";
+      }
+
+      function matchesRegion(job, region) {
+        if (region === "all") return true;
+        const areaLower = job.area.toLowerCase();
+        if (region === "sydney") return areaLower.includes("sydney");
+        if (region === "melbourne") return areaLower.includes("melbourne");
+        return true;
+      }
+
+      function matchesSearch(job, analysis, query) {
+        if (!query) return true;
+        const haystacks = [
+          job.job_title,
+          job.business_name,
+          job.area,
+          job.work_type,
+          job.pay_range,
+          job.id
+        ];
+        if (analysis) {
+          haystacks.push(
+            analysis.resume,
+            analysis.experience,
+            analysis.visa_sponsoring,
+            analysis.points_forts.join(" "),
+            analysis.points_a_verifier.join(" ")
+          );
+        }
+        return haystacks.join(" ").toLowerCase().includes(query);
+      }
+
+      function getFilteredAndSortedJobs() {
+        const query = state.search.trim().toLowerCase();
+        const filtered = [];
+
+        for (let i = 0; i < state.jobs.length; i += 1) {
+          const job = state.jobs[i];
+          const analysis = getAnalysisForJob(job);
+          if (!matchesRegion(job, state.region)) continue;
+          if (state.analysedOnly && !analysis) continue;
+          if (!matchesSearch(job, analysis, query)) continue;
+          filtered.push({ job: job, analysis: analysis });
+        }
+
+        filtered.sort(function (a, b) {
+          const scoreA = a.analysis && a.analysis.score !== null ? a.analysis.score : -1;
+          const scoreB = b.analysis && b.analysis.score !== null ? b.analysis.score : -1;
+          const tsA = a.job.postedTs !== null ? a.job.postedTs : -Infinity;
+          const tsB = b.job.postedTs !== null ? b.job.postedTs : -Infinity;
+
+          if (state.sort === "recent") {
+            if (tsB !== tsA) return tsB - tsA;
+            if (scoreB !== scoreA) return scoreB - scoreA;
+            return a.job.job_title.localeCompare(b.job.job_title, "fr");
+          }
+
+          if (scoreB !== scoreA) return scoreB - scoreA;
+          if (tsB !== tsA) return tsB - tsA;
+          return a.job.job_title.localeCompare(b.job.job_title, "fr");
+        });
+
+        return filtered;
+      }
+
+      function mapProgressStatus(rawStatus, completed, total) {
+        const lower = asText(rawStatus, "").toLowerCase();
+        if (lower === "running" || lower === "in_progress" || lower === "processing" || lower === "en_cours" || lower === "en cours") {
+          return { label: "Analyse en cours", tone: "is-running" };
+        }
+        if (lower === "completed" || lower === "done" || lower === "finished" || lower === "termine" || lower === "terminé") {
+          return { label: "Terminé", tone: "is-done" };
+        }
+        if (lower === "error" || lower === "failed" || lower === "erreur" || lower === "rate_limited") {
+          return { label: lower === "rate_limited" ? "Limite SEEK atteinte" : "Erreur", tone: "is-error" };
+        }
+        if (lower === "idle" || lower === "pending" || lower === "waiting" || lower === "en_attente") {
+          return { label: "En attente", tone: "" };
+        }
+        if (lower) {
+          return { label: rawStatus, tone: "" };
+        }
+        if (total > 0 && completed >= total) {
+          return { label: "Terminé", tone: "is-done" };
+        }
+        if (total > 0 && completed > 0) {
+          return { label: "Analyse en cours", tone: "is-running" };
+        }
+        return { label: "En attente", tone: "" };
+      }
+
+      function createSvgIcon(kind) {
+        const ns = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(ns, "svg");
+        svg.setAttribute("width", "15");
+        svg.setAttribute("height", "15");
+        svg.setAttribute("viewBox", "0 0 24 24");
+        svg.setAttribute("fill", "none");
+        svg.setAttribute("stroke", "currentColor");
+        svg.setAttribute("stroke-width", "1.85");
+        svg.setAttribute("stroke-linecap", "round");
+        svg.setAttribute("stroke-linejoin", "round");
+        svg.setAttribute("aria-hidden", "true");
+
+        function addEl(tag, attrs) {
+          const el = document.createElementNS(ns, tag);
+          const keys = Object.keys(attrs);
+          for (let i = 0; i < keys.length; i += 1) {
+            el.setAttribute(keys[i], attrs[keys[i]]);
+          }
+          svg.appendChild(el);
+        }
+
+        if (kind === "external") {
+          addEl("path", { d: "M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" });
+          addEl("polyline", { points: "15 3 21 3 21 9" });
+          addEl("line", { x1: "10", y1: "14", x2: "21", y2: "3" });
+        } else if (kind === "pin") {
+          addEl("path", { d: "M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0Z" });
+          addEl("circle", { cx: "12", cy: "10", r: "3" });
+        } else if (kind === "briefcase") {
+          addEl("rect", { x: "2", y: "7", width: "20", height: "14", rx: "2", ry: "2" });
+          addEl("path", { d: "M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" });
+        } else if (kind === "calendar") {
+          addEl("rect", { x: "3", y: "4", width: "18", height: "18", rx: "2", ry: "2" });
+          addEl("line", { x1: "16", y1: "2", x2: "16", y2: "6" });
+          addEl("line", { x1: "8", y1: "2", x2: "8", y2: "6" });
+          addEl("line", { x1: "3", y1: "10", x2: "21", y2: "10" });
+        } else if (kind === "back") {
+          addEl("line", { x1: "19", y1: "12", x2: "5", y2: "12" });
+          addEl("polyline", { points: "12 19 5 12 12 5" });
+        } else if (kind === "check") {
+          addEl("polyline", { points: "20 6 9 17 4 12" });
+        } else if (kind === "alert") {
+          addEl("circle", { cx: "12", cy: "12", r: "10" });
+          addEl("line", { x1: "12", y1: "8", x2: "12", y2: "12" });
+          addEl("line", { x1: "12", y1: "16", x2: "12.01", y2: "16" });
+        }
+        return svg;
+      }
+
+      function renderSyncHeader() {
+        const prog = state.progress;
+        const statusInfo = mapProgressStatus(prog.status, prog.completed, prog.total);
+
+        els.syncDot.className = "status-dot";
+        if (state.lastError) {
+          els.syncDot.classList.add("is-error");
+          els.syncText.textContent = "Erreur de synchronisation — nouvel essai dans 5 s";
+        } else if (!state.hasLoadedOnce) {
+          els.syncDot.classList.add("is-running");
+          els.syncText.textContent = "Chargement initial…";
+        } else {
+          if (statusInfo.tone) els.syncDot.classList.add(statusInfo.tone);
+          const timeStr = formatTime(state.lastUpdatedAt);
+          els.syncText.textContent = timeStr
+            ? "Mis à jour à " + timeStr + " (toutes les 5 s)"
+            : "Synchronisation active (toutes les 5 s)";
+        }
+
+        els.refreshBtn.disabled = state.isFetching;
+      }
+
+      function renderErrorBanner() {
+        if (state.lastError) {
+          els.errorBannerText.textContent = state.lastError;
+          els.errorBanner.hidden = false;
+        } else {
+          els.errorBanner.hidden = true;
+          els.errorBannerText.textContent = "";
+        }
+      }
+
+      function renderProgress() {
+        const completed = Math.max(0, Number(state.progress.completed) || 0);
+        const total = Math.max(0, Number(state.progress.total) || 0);
+        const statusInfo = mapProgressStatus(state.progress.status, completed, total);
+
+        els.progressStatusPill.className = "status-pill" + (statusInfo.tone ? " " + statusInfo.tone : "");
+        els.progressStatusPill.textContent = statusInfo.label;
+
+        const msg = asText(state.progress.message, "");
+        if (msg) {
+          els.progressMessage.textContent = msg;
+        } else if (!state.hasLoadedOnce) {
+          els.progressMessage.textContent = "En attente de la réponse du serveur local…";
+        } else if (total === 0) {
+          els.progressMessage.textContent = "Aucune tâche d'analyse planifiée pour le moment.";
+        } else {
+          els.progressMessage.textContent = completed + " offre(s) traitée(s) sur " + total + ".";
+        }
+
+        const pct = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0;
+        els.counterProgress.textContent = total > 0 ? (completed + " / " + total + " (" + pct + " %)") : (completed + " / 0");
+        els.counterJobs.textContent = String(state.jobs.length);
+
+        let analysedCount = 0;
+        for (let i = 0; i < state.jobs.length; i += 1) {
+          if (getAnalysisForJob(state.jobs[i])) analysedCount += 1;
+        }
+        els.counterAnalysed.textContent = String(analysedCount);
+
+        els.progressBar.setAttribute("aria-valuenow", String(pct));
+        els.progressFill.style.width = pct + "%";
+        els.progressFill.className = "progress-fill" + (statusInfo.tone === "is-done" ? " is-done" : statusInfo.tone === "is-error" ? " is-error" : "");
+      }
+
+      function renderFilterCounts() {
+        let sydney = 0;
+        let melbourne = 0;
+        let analysed = 0;
+        for (let i = 0; i < state.jobs.length; i += 1) {
+          const job = state.jobs[i];
+          if (matchesRegion(job, "sydney")) sydney += 1;
+          if (matchesRegion(job, "melbourne")) melbourne += 1;
+          if (getAnalysisForJob(job)) analysed += 1;
+        }
+        els.countRegionAll.textContent = String(state.jobs.length);
+        els.countRegionSydney.textContent = String(sydney);
+        els.countRegionMelbourne.textContent = String(melbourne);
+        els.countAnalysedFilter.textContent = String(analysed);
+
+        els.clearSearchBtn.hidden = state.search.length === 0;
+        const hasActiveFilters = state.search.trim().length > 0 || state.region !== "all" || state.analysedOnly;
+        els.resetFiltersBtn.hidden = !hasActiveFilters;
+      }
+
+      function createStateBox(title, description, actionLabel, onAction) {
+        const box = document.createElement("div");
+        box.className = "state-box";
+        const h3 = document.createElement("h3");
+        h3.textContent = title;
+        const p = document.createElement("p");
+        p.textContent = description;
+        box.appendChild(h3);
+        box.appendChild(p);
+        if (actionLabel && typeof onAction === "function") {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "btn";
+          btn.textContent = actionLabel;
+          btn.addEventListener("click", onAction);
+          box.appendChild(btn);
+        }
+        return box;
+      }
+
+      function renderList(entries) {
+        const activeEl = document.activeElement;
+        const focusedJobId = activeEl && els.listContainer.contains(activeEl) && activeEl.dataset
+          ? activeEl.dataset.jobId || null
+          : null;
+
+        els.listContainer.textContent = "";
+
+        if (!state.hasLoadedOnce) {
+          els.listHeading.textContent = "Chargement des offres…";
+          for (let s = 0; s < 3; s += 1) {
+            const sk = document.createElement("div");
+            sk.className = "skeleton-item";
+            sk.setAttribute("aria-hidden", "true");
+            const l1 = document.createElement("div");
+            l1.className = "skeleton-line w-70";
+            const l2 = document.createElement("div");
+            l2.className = "skeleton-line w-45";
+            const l3 = document.createElement("div");
+            l3.className = "skeleton-line w-90";
+            sk.appendChild(l1);
+            sk.appendChild(l2);
+            sk.appendChild(l3);
+            els.listContainer.appendChild(sk);
+          }
+          return;
+        }
+
+        const totalUnique = state.jobs.length;
+        const visibleCount = entries.length;
+        const dupInfo = state.rawJobsCount > totalUnique
+          ? " (" + (state.rawJobsCount - totalUnique) + " doublon(s) retiré(s))"
+          : "";
+
+        els.listHeading.textContent = visibleCount === totalUnique
+          ? totalUnique + " offre(s) unique(s)" + dupInfo
+          : visibleCount + " sur " + totalUnique + " offre(s) unique(s)";
+
+        if (totalUnique === 0) {
+          els.listContainer.appendChild(
+            createStateBox(
+              "Aucune offre disponible pour le moment",
+              "Le serveur local n'a encore retourné aucune annonce. La liste se met à jour automatiquement toutes les 5 secondes.",
+              null,
+              null
+            )
+          );
+          return;
+        }
+
+        if (visibleCount === 0) {
+          els.listContainer.appendChild(
+            createStateBox(
+              "Aucune offre ne correspond à vos filtres",
+              "Essayez d'élargir la zone géographique, de désactiver le filtre « Analysées uniquement » ou de modifier votre recherche.",
+              "Réinitialiser les filtres",
+              resetFilters
+            )
+          );
+          return;
+        }
+
+        const ul = document.createElement("ul");
+        ul.className = "jobs-list";
+
+        for (let i = 0; i < entries.length; i += 1) {
+          const entry = entries[i];
+          const job = entry.job;
+          const analysis = entry.analysis;
+          const isSelected = state.selectedId === job.id;
+
+          const li = document.createElement("li");
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "job-item-btn";
+          btn.dataset.jobId = job.id;
+          if (isSelected) {
+            btn.setAttribute("aria-current", "true");
+          }
+
+          btn.addEventListener("click", function () {
+            selectJob(job.id, true);
+          });
+
+          const topRow = document.createElement("div");
+          topRow.className = "job-row-top";
+
+          const titleEl = document.createElement("p");
+          titleEl.className = "job-title";
+          titleEl.textContent = job.job_title;
+
+          const badge = document.createElement("span");
+          if (analysis && analysis.score !== null) {
+            badge.className = "score-badge " + getScoreTier(analysis.score);
+            badge.textContent = analysis.score + "/100";
+            badge.title = "Score indicatif sur 100";
+          } else if (analysis) {
+            badge.className = "score-badge";
+            badge.textContent = "Analysée";
+          } else {
+            badge.className = "score-badge score-pending";
+            badge.textContent = "Non analysée";
+          }
+
+          topRow.appendChild(titleEl);
+          topRow.appendChild(badge);
+          btn.appendChild(topRow);
+
+          const companyEl = document.createElement("p");
+          companyEl.className = "job-company";
+          companyEl.textContent = job.business_name;
+          btn.appendChild(companyEl);
+
+          const metaRow = document.createElement("div");
+          metaRow.className = "job-meta-row";
+
+          const areaChip = document.createElement("span");
+          areaChip.className = "meta-chip";
+          areaChip.appendChild(createSvgIcon("pin"));
+          const areaTxt = document.createElement("span");
+          areaTxt.textContent = job.area;
+          areaChip.appendChild(areaTxt);
+          metaRow.appendChild(areaChip);
+
+          if (job.work_type) {
+            const wtChip = document.createElement("span");
+            wtChip.className = "meta-chip";
+            wtChip.textContent = job.work_type;
+            metaRow.appendChild(wtChip);
+          }
+
+          if (job.pay_range) {
+            const payChip = document.createElement("span");
+            payChip.className = "meta-chip";
+            payChip.textContent = job.pay_range;
+            metaRow.appendChild(payChip);
+          }
+
+          if (job.posted_date) {
+            const dateChip = document.createElement("span");
+            dateChip.className = "meta-chip";
+            dateChip.textContent = formatPostedDate(job.posted_date);
+            metaRow.appendChild(dateChip);
+          }
+
+          btn.appendChild(metaRow);
+
+          if (analysis && analysis.resume && analysis.resume !== "Non précisé") {
+            const snippet = document.createElement("p");
+            snippet.className = "job-snippet";
+            snippet.textContent = analysis.resume;
+            btn.appendChild(snippet);
+          }
+
+          li.appendChild(btn);
+          ul.appendChild(li);
+        }
+
+        els.listContainer.appendChild(ul);
+
+        if (focusedJobId) {
+          const buttons = ul.querySelectorAll(".job-item-btn");
+          for (let b = 0; b < buttons.length; b += 1) {
+            if (buttons[b].dataset.jobId === focusedJobId) {
+              buttons[b].focus({ preventScroll: true });
+              break;
+            }
+          }
+        }
+      }
+
+      function buildDetailSignature(selectedEntry) {
+        if (!selectedEntry) {
+          return "empty:" + (state.jobs.length === 0 ? "0" : "filtered");
+        }
+        return JSON.stringify({
+          job: selectedEntry.job,
+          analysis: selectedEntry.analysis,
+          mobile: state.mobileDetailOpen,
+          progStatus: selectedEntry.analysis ? "" : state.progress.status
+        });
+      }
+
+      function renderDetail(entries) {
+        let selectedEntry = null;
+        if (state.selectedId !== null) {
+          for (let i = 0; i < entries.length; i += 1) {
+            if (entries[i].job.id === state.selectedId) {
+              selectedEntry = entries[i];
+              break;
+            }
+          }
+        }
+
+        if (!selectedEntry && entries.length > 0) {
+          selectedEntry = entries[0];
+          state.selectedId = selectedEntry.job.id;
+        }
+
+        els.workspace.classList.toggle("mobile-detail-open", Boolean(selectedEntry) && state.mobileDetailOpen);
+
+        const nextSig = buildDetailSignature(selectedEntry);
+        if (nextSig === state.lastDetailSignature) {
+          return;
+        }
+        state.lastDetailSignature = nextSig;
+
+        els.detailPanel.textContent = "";
+
+        if (!selectedEntry) {
+          els.workspace.classList.remove("mobile-detail-open");
+          els.detailPanel.appendChild(
+            createStateBox(
+              "Aucune offre sélectionnée",
+              state.jobs.length === 0
+                ? "Les détails d'analyse apparaîtront ici dès que des offres seront chargées."
+                : "Ajustez vos filtres pour afficher une offre et consulter son analyse.",
+              null,
+              null
+            )
+          );
+          return;
+        }
+
+        if (state.mobileDetailOpen) {
+          els.workspace.classList.add("mobile-detail-open");
+        } else {
+          els.workspace.classList.remove("mobile-detail-open");
+        }
+
+        const job = selectedEntry.job;
+        const analysis = selectedEntry.analysis;
+
+        const backRow = document.createElement("div");
+        backRow.className = "mobile-back-row";
+        const backBtn = document.createElement("button");
+        backBtn.type = "button";
+        backBtn.className = "btn btn-quiet";
+        backBtn.appendChild(createSvgIcon("back"));
+        const backLabel = document.createElement("span");
+        backLabel.textContent = "Retour à la liste";
+        backBtn.appendChild(backLabel);
+        backBtn.addEventListener("click", closeMobileDetail);
+        backRow.appendChild(backBtn);
+        els.detailPanel.appendChild(backRow);
+
+        const head = document.createElement("div");
+        head.className = "detail-head";
+
+        const titleRow = document.createElement("div");
+        titleRow.className = "detail-title-row";
+
+        const titleWrap = document.createElement("div");
+        const titleEl = document.createElement("h2");
+        titleEl.className = "detail-title";
+        titleEl.textContent = job.job_title;
+        const companyEl = document.createElement("p");
+        companyEl.className = "detail-company";
+        companyEl.textContent = job.business_name;
+        titleWrap.appendChild(titleEl);
+        titleWrap.appendChild(companyEl);
+
+        titleRow.appendChild(titleWrap);
+        head.appendChild(titleRow);
+
+        const facts = document.createElement("ul");
+        facts.className = "detail-facts";
+
+        function addFact(iconKind, text) {
+          const li = document.createElement("li");
+          if (iconKind) li.appendChild(createSvgIcon(iconKind));
+          const span = document.createElement("span");
+          span.textContent = text;
+          li.appendChild(span);
+          facts.appendChild(li);
+        }
+
+        addFact("pin", job.area);
+        if (job.work_type) addFact("briefcase", job.work_type);
+        if (job.pay_range) addFact(null, "Rémunération : " + job.pay_range);
+        addFact("calendar", "Publiée : " + formatPostedDate(job.posted_date));
+        if (job.hasExplicitId) {
+          const idLi = document.createElement("li");
+          idLi.className = "detail-id";
+          idLi.textContent = "ID " + job.id;
+          facts.appendChild(idLi);
+        }
+        head.appendChild(facts);
+
+        const actions = document.createElement("div");
+        actions.className = "detail-actions";
+
+        if (job.safeUrl) {
+          const link = document.createElement("a");
+          link.className = "btn btn-primary";
+          link.href = job.safeUrl;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          const linkText = document.createElement("span");
+          linkText.textContent = "Ouvrir l'annonce originale sur SEEK";
+          link.appendChild(linkText);
+          link.appendChild(createSvgIcon("external"));
+          actions.appendChild(link);
+        } else {
+          const unavailable = document.createElement("span");
+          unavailable.className = "link-unavailable";
+          unavailable.textContent = "Lien HTTPS SEEK indisponible ou non vérifié";
+          actions.appendChild(unavailable);
+        }
+
+        head.appendChild(actions);
+        els.detailPanel.appendChild(head);
+
+        if (!analysis) {
+          const statusInfo = mapProgressStatus(
+            state.progress.status,
+            Number(state.progress.completed) || 0,
+            Number(state.progress.total) || 0
+          );
+          const pendingText = statusInfo.tone === "is-running"
+            ? "Cette offre fait partie de la liste dédoublonnée mais n'a pas encore été analysée. L'analyse est en cours et la vue s'actualise toutes les 5 secondes."
+            : "Aucune analyse locale n'est enregistrée pour cette offre pour le moment. Vous pouvez tout de même consulter l'annonce officielle sur SEEK.";
+          els.detailPanel.appendChild(
+            createStateBox("Analyse non disponible", pendingText, null, null)
+          );
+          return;
+        }
+
+        const section = document.createElement("div");
+        section.className = "analysis-section";
+
+        const scoreBox = document.createElement("div");
+        scoreBox.className = "score-summary-box";
+
+        const scoreLeft = document.createElement("div");
+        scoreLeft.className = "score-big-group";
+        const scoreVal = document.createElement("span");
+        scoreVal.className = "score-big-value " + getScoreTier(analysis.score);
+        scoreVal.textContent = analysis.score !== null ? (analysis.score + " / 100") : "Score indisponible";
+        scoreLeft.appendChild(scoreVal);
+
+        const scoreNote = document.createElement("p");
+        scoreNote.className = "score-indicative-note";
+        scoreNote.textContent = "Score indicatif généré localement — vérifiez toujours l'annonce complète.";
+
+        scoreBox.appendChild(scoreLeft);
+        scoreBox.appendChild(scoreNote);
+        section.appendChild(scoreBox);
+
+        const resumeBlock = document.createElement("div");
+        resumeBlock.className = "detail-block";
+        const resumeH3 = document.createElement("h3");
+        resumeH3.textContent = "Résumé de l'adéquation";
+        const resumeP = document.createElement("p");
+        resumeP.className = "detail-prose";
+        resumeP.textContent = analysis.resume;
+        resumeBlock.appendChild(resumeH3);
+        resumeBlock.appendChild(resumeP);
+        section.appendChild(resumeBlock);
+
+        const bulletGrid = document.createElement("div");
+        bulletGrid.className = "bullet-grid";
+
+        function createBulletBox(title, items, extraClass, iconKind) {
+          const box = document.createElement("div");
+          box.className = "bullet-box " + extraClass;
+          const h3 = document.createElement("h3");
+          h3.appendChild(createSvgIcon(iconKind));
+          const span = document.createElement("span");
+          span.textContent = title;
+          h3.appendChild(span);
+          box.appendChild(h3);
+
+          if (items.length === 0) {
+            const emptyP = document.createElement("p");
+            emptyP.className = "score-indicative-note";
+            emptyP.textContent = "Non précisé";
+            box.appendChild(emptyP);
+          } else {
+            const ul = document.createElement("ul");
+            ul.className = "bullet-list";
+            for (let i = 0; i < items.length; i += 1) {
+              const li = document.createElement("li");
+              li.textContent = items[i];
+              ul.appendChild(li);
+            }
+            box.appendChild(ul);
+          }
+          return box;
+        }
+
+        bulletGrid.appendChild(createBulletBox("Points forts", analysis.points_forts, "is-strengths", "check"));
+        bulletGrid.appendChild(createBulletBox("Points à vérifier", analysis.points_a_verifier, "is-checks", "alert"));
+        section.appendChild(bulletGrid);
+
+        const evidenceGrid = document.createElement("div");
+        evidenceGrid.className = "evidence-grid";
+
+        function createEvidenceBox(title, value, quote, isVisa) {
+          const box = document.createElement("div");
+          box.className = "evidence-box" + (isVisa ? " is-visa" : "");
+
+          const h3 = document.createElement("h3");
+          h3.textContent = title;
+          box.appendChild(h3);
+
+          const valP = document.createElement("p");
+          valP.className = "evidence-value";
+          valP.textContent = value;
+          box.appendChild(valP);
+
+          const quoteEl = document.createElement("blockquote");
+          quoteEl.className = "evidence-quote";
+          quoteEl.textContent = "Extrait : " + quote;
+          box.appendChild(quoteEl);
+
+          if (isVisa) {
+            const note = document.createElement("p");
+            note.className = "visa-disclaimer";
+            note.textContent = "Mention visa / droit au travail à confirmer directement dans l'annonce SEEK.";
+            box.appendChild(note);
+          }
+          return box;
+        }
+
+        evidenceGrid.appendChild(
+          createEvidenceBox("Expérience demandée", analysis.experience, analysis.preuve_experience, false)
+        );
+        evidenceGrid.appendChild(
+          createEvidenceBox("Visa / sponsoring", analysis.visa_sponsoring, analysis.preuve_visa, true)
+        );
+        section.appendChild(evidenceGrid);
+
+        els.detailPanel.appendChild(section);
+      }
+
+      function renderAll() {
+        renderSyncHeader();
+        renderErrorBanner();
+        renderProgress();
+        renderFilterCounts();
+        const entries = getFilteredAndSortedJobs();
+        if (entries.length > 0) {
+          const stillPresent = entries.some(function (e) { return e.job.id === state.selectedId; });
+          if (!stillPresent) {
+            state.selectedId = entries[0].job.id;
+          }
+        } else {
+          state.selectedId = null;
+        }
+        renderList(entries);
+        renderDetail(entries);
+      }
+
+      function selectJob(jobId, fromUser) {
+        state.selectedId = jobId;
+        if (fromUser && window.matchMedia("(max-width: 1024px)").matches) {
+          state.mobileDetailOpen = true;
+        }
+        renderAll();
+        if (fromUser && state.mobileDetailOpen) {
+          els.detailPanel.focus();
+          window.scrollTo({ top: 0, behavior: "auto" });
+        }
+      }
+
+      function closeMobileDetail() {
+        state.mobileDetailOpen = false;
+        state.lastDetailSignature = "";
+        els.workspace.classList.remove("mobile-detail-open");
+        const activeBtn = els.listContainer.querySelector('[aria-current="true"]');
+        if (activeBtn) {
+          activeBtn.focus();
+        }
+      }
+
+      function resetFilters() {
+        state.search = "";
+        state.region = "all";
+        state.analysedOnly = false;
+        els.searchInput.value = "";
+        els.analysedOnlyBtn.setAttribute("aria-pressed", "false");
+        for (let i = 0; i < els.regionBtns.length; i += 1) {
+          els.regionBtns[i].setAttribute("aria-pressed", els.regionBtns[i].dataset.region === "all" ? "true" : "false");
+        }
+        renderAll();
+        els.searchInput.focus();
+      }
+
+      function applyPayload(payload) {
+        if (!payload || typeof payload !== "object") {
+          throw new Error("Format JSON inattendu reçu de /api/state.");
+        }
+
+        const rawJobs = Array.isArray(payload.jobs) ? payload.jobs : [];
+        state.rawJobsCount = rawJobs.length;
+        state.jobs = deduplicateJobs(rawJobs);
+
+        const nextAnalyses = Object.create(null);
+        if (payload.analyses && typeof payload.analyses === "object" && !Array.isArray(payload.analyses)) {
+          const keys = Object.keys(payload.analyses);
+          for (let i = 0; i < keys.length; i += 1) {
+            const key = String(keys[i]).trim();
+            if (!key) continue;
+            const normalized = normalizeAnalysis(payload.analyses[keys[i]]);
+            if (normalized) {
+              nextAnalyses[key] = normalized;
+            }
+          }
+        }
+        state.analyses = nextAnalyses;
+
+        const prog = payload.progress && typeof payload.progress === "object" ? payload.progress : {};
+        state.progress = {
+          completed: Number.isFinite(Number(prog.completed)) ? Number(prog.completed) : 0,
+          total: Number.isFinite(Number(prog.total)) ? Number(prog.total) : 0,
+          status: asText(prog.status, "idle"),
+          message: asText(prog.message, "")
+        };
+
+        state.hasLoadedOnce = true;
+        state.lastUpdatedAt = new Date();
+        state.lastError = null;
+      }
+
+      function scheduleNextPoll() {
+        if (state.pollTimer !== null) {
+          window.clearTimeout(state.pollTimer);
+        }
+        state.pollTimer = window.setTimeout(function () {
+          fetchState();
+        }, POLL_INTERVAL_MS);
+      }
+
+      async function fetchState() {
+        if (state.isFetching) return;
+        state.isFetching = true;
+        renderSyncHeader();
+
+        try {
+          const response = await fetch(API_URL, {
+            method: "GET",
+            headers: { "Accept": "application/json" },
+            cache: "no-store"
+          });
+          if (!response.ok) {
+            throw new Error("Le serveur local a répondu avec le code HTTP " + response.status + ".");
+          }
+          const data = await response.json();
+          applyPayload(data);
+        } catch (err) {
+          const reason = err && err.message ? err.message : "Connexion impossible.";
+          state.lastError = "Impossible de récupérer l'état local (/api/state) : " + reason + " Nouvelle tentative automatique dans 5 s.";
+        } finally {
+          state.isFetching = false;
+          renderAll();
+          scheduleNextPoll();
+        }
+      }
+
+      // Event bindings
+      els.refreshBtn.addEventListener("click", function () {
+        fetchState();
+      });
+
+      els.retryBtn.addEventListener("click", function () {
+        fetchState();
+      });
+
+      els.searchInput.addEventListener("input", function (event) {
+        state.search = event.target.value;
+        renderAll();
+      });
+
+      els.clearSearchBtn.addEventListener("click", function () {
+        state.search = "";
+        els.searchInput.value = "";
+        renderAll();
+        els.searchInput.focus();
+      });
+
+      for (let i = 0; i < els.regionBtns.length; i += 1) {
+        els.regionBtns[i].addEventListener("click", function (event) {
+          const btn = event.currentTarget;
+          const nextRegion = btn.dataset.region || "all";
+          state.region = nextRegion;
+          for (let j = 0; j < els.regionBtns.length; j += 1) {
+            els.regionBtns[j].setAttribute(
+              "aria-pressed",
+              els.regionBtns[j].dataset.region === nextRegion ? "true" : "false"
+            );
+          }
+          renderAll();
+        });
+      }
+
+      els.analysedOnlyBtn.addEventListener("click", function () {
+        state.analysedOnly = !state.analysedOnly;
+        els.analysedOnlyBtn.setAttribute("aria-pressed", state.analysedOnly ? "true" : "false");
+        renderAll();
+      });
+
+      els.sortSelect.addEventListener("change", function (event) {
+        state.sort = event.target.value === "recent" ? "recent" : "score";
+        renderAll();
+      });
+
+      els.resetFiltersBtn.addEventListener("click", resetFilters);
+
+      document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape" && state.mobileDetailOpen) {
+          closeMobileDetail();
+        }
+      });
+
+      window.addEventListener("resize", function () {
+        if (!window.matchMedia("(max-width: 1024px)").matches && state.mobileDetailOpen) {
+          state.mobileDetailOpen = false;
+          els.workspace.classList.remove("mobile-detail-open");
+        }
+      });
+
+      // Initial load
+      fetchState();
+    })();
+  </script>
+</body>
+</html>
