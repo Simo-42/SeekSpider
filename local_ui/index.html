@@ -1341,7 +1341,7 @@
           <line x1="12" y1="17" x2="12.01" y2="17"></line>
         </svg>
         <div>
-          <strong>Scores indicatifs :</strong> les évaluations servent uniquement à prioriser la lecture.
+          <strong>Scores indicatifs :</strong> LFM3 attribue souvent des notes identiques ; SEEK peut aussi retourner des métiers hors cible. Vérifiez l'intitulé et l'annonce.
           <strong>Visa et sponsoring à vérifier</strong> directement sur l'annonce officielle SEEK avant toute candidature.
         </div>
       </div>
@@ -1577,7 +1577,7 @@
           return now - 86400000;
         }
 
-        const relMatch = lower.match(/(\d+)\s*(m|min|h|hr|hour|d|day|j|w|week|sem|mo|month)/);
+        const relMatch = lower.match(/(\d+)\s*(month|mo|min|m|hour|hr|h|day|d|j|week|w|sem)/);
         if (relMatch) {
           const amount = Number(relMatch[1]);
           const unit = relMatch[2];
@@ -1704,7 +1704,9 @@
           haystacks.push(
             analysis.resume,
             analysis.experience,
+            analysis.preuve_experience,
             analysis.visa_sponsoring,
+            analysis.preuve_visa,
             analysis.points_forts.join(" "),
             analysis.points_a_verifier.join(" ")
           );

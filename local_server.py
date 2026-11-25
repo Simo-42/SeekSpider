@@ -7,7 +7,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
-from job_filters import experience_exclusion, is_senior
+from job_filters import experience_evidence, experience_exclusion, is_senior
 
 
 def read_jobs(path, include_senior=False):
@@ -65,19 +65,32 @@ def container_running(container):
 def state(jobs_path, report, total, container, profile=None):
     all_jobs = read_jobs(jobs_path, include_senior=True)
     analyses = read_analyses(report)
+    for job_id, analysis in list(analyses.items()):
+        updated = dict(analysis)
+        old_experience = updated.get("preuve_experience", "")
+        if old_experience and not experience_evidence(old_experience):
+            updated["preuve_experience"] = "Aucun extrait pertinent repéré automatiquement"
+            updated["experience"] = "Expérience demandée à vérifier dans l'annonce."
+        old_visa = updated.get("preuve_visa", "")
+        if (re.search(r"\b(?:regardless\s+of|without\s+regard\s+to)\b[^.]{0,200}\bcitizenship\b", old_visa, re.I)
+                and not re.search(r"\b(?:visa|sponsor\w*|work(?:ing)?\s+rights?|right\s+to\s+work)\b", old_visa, re.I)):
+            updated["preuve_visa"] = "Aucun extrait pertinent repéré automatiquement"
+            updated["visa_sponsoring"] = "Visa et droit au travail à vérifier dans l'annonce."
+        analyses[job_id] = updated
     running = container_running(container)
     excluded_ids = {job_id for job_id, analysis in analyses.items()
                     if experience_exclusion(analysis.get("preuve_experience", ""))}
-    failures = 0
+    failed_ids = set()
     try:
         saved = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))
-        failures = len(saved.get("echecs", []))
+        failed_ids = {str(row["job"]["job_id"]) for row in saved.get("echecs", [])}
         excluded_ids.update(str(row["job"]["job_id"]) for row in saved.get("exclusions", []))
     except (OSError, ValueError, TypeError, KeyError):
         pass
     jobs = [job for job in all_jobs if not is_senior(job) and str(job["job_id"]) not in excluded_ids]
     visible_ids = {str(job["job_id"]) for job in jobs}
     analyses = {job_id: analysis for job_id, analysis in analyses.items() if job_id in visible_ids}
+    failures = len((failed_ids & visible_ids) - analyses.keys())
     completed = len(analyses)
     if running:
         status, message = "running", "Analyse locale en cours"

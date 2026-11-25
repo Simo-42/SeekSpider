@@ -33,3 +33,25 @@ def test_state_hides_past_and_new_five_year_exclusions(tmp_path):
     assert [job['job_id'] for job in state['jobs']] == ['1']
     assert state['progress']['excluded'] == 2
     assert state['progress']['completed'] == state['progress']['total'] == 1
+
+
+def test_state_hides_misleading_evidence_from_older_results(tmp_path):
+    jobs, report = tmp_path / 'jobs.jsonl', tmp_path / 'report.md'
+    jobs.write_text(json.dumps({'job_id': '1', 'job_title': 'Cloud Engineer'}), encoding='utf-8')
+    data = {'analyses': [{'offre': {'job_id': '1'}, 'analyse': {'score': 45,
+        'preuve_experience': 'A business with more than 30 years of experience.',
+        'preuve_visa': 'Equal opportunity regardless of race, colour, religion, citizenship, or age.'}}]}
+    report.with_suffix('.json').write_text(json.dumps(data), encoding='utf-8')
+    analysis = server.state(jobs, report, 1, '')['analyses']['1']
+    assert 'Aucun extrait pertinent' in analysis['preuve_experience']
+    assert 'Aucun extrait pertinent' in analysis['preuve_visa']
+
+
+def test_stale_failures_do_not_block_finished_status(tmp_path):
+    jobs, report = tmp_path / 'jobs.jsonl', tmp_path / 'report.md'
+    jobs.write_text(json.dumps({'job_id': '1', 'job_title': 'Cloud Engineer'}), encoding='utf-8')
+    data = {'analyses': [{'offre': {'job_id': '1'}, 'analyse': {'score': 45}}],
+            'echecs': [{'job': {'job_id': '999'}, 'status': 'not_found'}]}
+    report.with_suffix('.json').write_text(json.dumps(data), encoding='utf-8')
+    progress = server.state(jobs, report, 1, '')['progress']
+    assert progress['status'] == 'finished' and progress['failed'] == 0

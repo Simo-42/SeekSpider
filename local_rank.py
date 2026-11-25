@@ -9,7 +9,7 @@ from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
-from job_filters import experience_exclusion, is_senior
+from job_filters import experience_evidence, experience_exclusion, is_senior
 
 
 spec = importlib.util.spec_from_file_location(
@@ -24,7 +24,8 @@ PRIORITY = ("cloud support engineer", "cloud operations engineer",
             "junior devops engineer", "infrastructure engineer")
 
 VISA_TERMS = re.compile(
-    r"\b(?:visa(?:s)?|sponsor(?:ship|ed|ing)?|citizen(?:s|ship)?|permanent\s+residen(?:t|cy)|"
+    r"\b(?:visa(?:s)?|sponsor(?:ship|ed|ing)?|citizen(?:s|ship)?|permanent\s+residen(?:ts?|cy)|"
+    r"working\s+holiday|WHV|subclass\s+(?:417|462|482)|NV1|NV2|TSPV|AGSVA|"
     r"(?:full|unrestricted|unlimited|valid)\s+(?:australian\s+)?work(?:ing)?\s+rights?|"
     r"(?:australian\s+)?work(?:ing)?\s+rights?|rights?\s+to\s+work|right\s+to\s+live\s+and\s+work|"
     r"(?:eligible|eligibility|authori[sz]ed|entitled)\s+to\s+work|work(?:ing)?\s+authori[sz]ation|"
@@ -42,17 +43,23 @@ UNSAFE_MODEL_TERMS = re.compile(
 
 def extract_evidence(description, pattern):
     """Return an exact, bounded source excerpt; do not infer eligibility."""
+    if pattern is EXPERIENCE_TERMS:
+        return experience_evidence(description)
     matches = list(pattern.finditer(description))
     if pattern is VISA_TERMS:
         def unrelated(match):
             context = description[max(0, match.start() - 35):min(len(description), match.end() + 55)]
-            return bool(re.search(r"\b(?:visa\s*(?:/|and|or|,)?\s*mastercard|corporate\s+citizenship|(?:event|sports?|marketing)\s+sponsorship|sponsorship\s+(?:of|for)\s+(?:events?|sports?))\b", context, re.I))
+            if re.search(r"\b(?:regardless\s+of|without\s+regard\s+to)\b[^.]{0,180}$", description[max(0, match.start() - 180):match.start()], re.I):
+                return True
+            return bool(re.search(r"\b(?:visa\s*(?:/|and|or|,)?\s*mastercard|corporate\s+citizenship|(?:executive|project|event|sports?|marketing)\s+sponsor(?:ship)?|sponsorship\s+(?:of|for)\s+(?:events?|sports?))\b", context, re.I))
         matches = [match for match in matches if not unrelated(match)]
     if not matches:
         return None
     def priority(match):
         context = description[max(0, match.start() - 100):min(len(description), match.end() + 100)]
-        return bool(re.search(r"\b(?:must|required|mandatory|only|unable|cannot|no|not|without)\b", context, re.I))
+        return (bool(re.search(r"citizen|residen", match.group(), re.I)),
+                bool(re.search(r"\b(?:must|required|mandatory|only|unable|cannot|no|not|without)\b", context, re.I)),
+                bool(re.search(r"visa|sponsor", match.group(), re.I)))
     match = max(matches, key=priority)
     left, right = max(0, match.start() - 150), min(len(description), match.end() + 180)
     previous = description.rfind(". ", left, match.start())
@@ -88,7 +95,7 @@ def attach_source_evidence(result, description):
     return result
 
 
-def select_jobs(path, limit):
+def select_jobs(path, limit=None):
     unique = {}
     for line in path.read_text(encoding="utf-8").splitlines():
         if line.strip():
@@ -124,7 +131,7 @@ PROFIL :\n{profile}\n\nMÉTADONNÉES DE L'OFFRE :\n{json.dumps({k: job.get(k, ''
     }, timeout=300)
     response.raise_for_status()
     result = json.loads(response.json()["message"]["content"])
-    if not isinstance(result.get("score"), int) or not 0 <= result["score"] <= 100:
+    if type(result.get("score")) is not int or not 0 <= result["score"] <= 100:
         raise ValueError("Score absent ou hors limites")
     for field in ("resume",):
         if not isinstance(result.get(field), str):
@@ -186,10 +193,10 @@ def main():
             raise ValueError("Fichier d'analyses invalide")
         if not isinstance(exclusions, list):
             raise ValueError("Fichier d'exclusions invalide")
-    jobs = select_jobs(args.input, args.limit)
+    jobs = select_jobs(args.input)
     already_done = {str(row["offre"]["job_id"]) for row in results}
     already_done.update(str(row["job"]["job_id"]) for row in exclusions)
-    jobs = [job for job in jobs if str(job["job_id"]) not in already_done]
+    jobs = [job for job in jobs if str(job["job_id"]) not in already_done][:args.limit]
     for i, job in enumerate(jobs, 1):
         html, _, status = fetcher.fetch_job_detail(job["job_id"])
         if status != "success":

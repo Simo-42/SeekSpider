@@ -53,11 +53,14 @@ def test_extracts_negative_and_positive_visa_mentions():
     for text in ("Applicants must have full working rights in Australia. No visa sponsorship is available.",
                  "Visa sponsorship is available for eligible applicants.",
                  "Candidates must be eligible to work in Australia.",
-                 "Only Australian citizens are eligible."):
+                 "Only Australian citizens are eligible.",
+                 "Professionals with NV2 & TSPV clearances are required."):
         evidence = rank.extract_evidence(text, rank.VISA_TERMS)
         assert evidence and evidence in text
     assert rank.extract_evidence("Experience with security incident response.", rank.VISA_TERMS) is None
     assert rank.extract_evidence("Accepts Visa and Mastercard. We value corporate citizenship.", rank.VISA_TERMS) is None
+    assert rank.extract_evidence("Equal opportunity regardless of race, color, ancestry, religion, sex, citizenship, marital status or disability.", rank.VISA_TERMS) is None
+    assert rank.extract_evidence("Only Australian permanent residents may apply.", rank.VISA_TERMS)
 
 
 def test_finds_evidence_beyond_model_context():
@@ -73,7 +76,9 @@ def test_excludes_clear_five_year_minimum_but_not_ranges_or_optional():
                  "Minimum 5-7 years of relevant experience.",
                  "5 to 7 years of relevant experience required.",
                  "Six years of experience in cloud engineering.",
-                 "A minimum of 6.5+ years of experience."):
+                 "A minimum of 6.5+ years of experience.",
+                 "5+ years in a similar infrastructure role.",
+                 "5+ years designing, deploying and maintaining secure cloud infrastructure."):
         proof = rank.experience_exclusion(text)
         assert proof and proof in text
     for text in ("3-5 years of experience.", "3 to 5 years of experience.", "three to five years of experience.", "Up to 5 years of experience.",
@@ -83,8 +88,21 @@ def test_excludes_clear_five_year_minimum_but_not_ranges_or_optional():
                  "A 5-year contract with experienced colleagues.",
                  "A five-year warranty on the product.",
                  "An Australian consultancy with over 15 years of experience, we help businesses.",
+                 "We have over 15 years of industry experience delivering cloud solutions.",
+                 "Great customer experience. 5 years fixed term contract.",
                  "Our business has over 30 years of experience."):
         assert rank.experience_exclusion(text) is None, text
+
+
+def test_experience_proof_ignores_company_history_and_contracts():
+    for text in ("For the next 50 years.", "Our business has 30 years of experience.",
+                 "Great customer experience. 5 years fixed term contract.",
+                 "NEXTDC is a company, only 16 years young."):
+        assert rank.experience_evidence(text) is None, text
+    proof = rank.experience_evidence("Minimum 2 years of experience in IT support.")
+    assert proof == "Minimum 2 years of experience in IT support."
+    text = "NEXTDC is a company, only 16 years young and operating 18 data centres."
+    assert rank.experience_exclusion(text) is None
 
 
 def test_search_targets_all_titles_and_australia():
@@ -104,7 +122,7 @@ def test_resume_preserves_existing_and_skips_it(tmp_path):
     existing = {"offre": {"job_id": "1", "job_title": "Cloud"}, "analyse": {"score": 70, "resume": "OK", "points_forts": [], "points_a_verifier": [], "experience": "non précisé", "preuve_experience": "non précisé", "visa_sponsoring": "non précisé", "preuve_visa": "non précisé"}}
     jobs.write_text('\n'.join(json.dumps(job) for job in [existing["offre"], {"job_id": "2", "job_title": "Cloud"}, {"job_id": "3", "job_title": "Senior Cloud"}]), encoding="utf-8")
     report.with_suffix('.json').write_text(json.dumps({"analyses": [existing], "echecs": []}), encoding="utf-8")
-    with patch('sys.argv', ['local_rank', str(jobs), str(report), '--resume']), \
+    with patch('sys.argv', ['local_rank', str(jobs), str(report), '--resume', '--limit', '1']), \
          patch.object(rank.fetcher, 'fetch_job_detail', return_value=('<p>Cloud</p>', None, 'success')) as fetch, \
          patch.object(rank, 'analyze', return_value=existing['analyse']), \
          patch.object(rank.time, 'sleep'):
