@@ -28,6 +28,7 @@ def test_state_hides_past_and_new_five_year_exclusions(tmp_path):
                          {'offre': {'job_id': '1'}, 'analyse': {'score': 75, 'preuve_experience': '3-5 years of experience.'}}],
             'exclusions': [{'job': {'job_id': '2'}, 'reason': 'At least 5 years of experience.'}]}
     report.with_suffix('.json').write_text(json.dumps(data), encoding='utf-8')
+    report.write_text('Rapport en cours de mise à jour.', encoding='utf-8')
     state = server.state(jobs, report, 3, '')
     assert [job['job_id'] for job in state['jobs']] == ['1']
     assert state['progress']['excluded'] == 2

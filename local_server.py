@@ -25,7 +25,7 @@ def read_jobs(path, include_senior=False):
 
 def read_analyses(report):
     json_path = report.with_suffix(".json")
-    if json_path.exists() and (not report.exists() or json_path.stat().st_mtime >= report.stat().st_mtime):
+    if json_path.exists():
         try:
             data = json.loads(json_path.read_text(encoding="utf-8"))
             return {str(row["offre"]["job_id"]): row["analyse"] for row in data["analyses"]}
