@@ -47,18 +47,42 @@ def test_fit_score_is_deterministic_and_rewards_profile_skill_overlap():
     weak = rank.calculate_fit_score(job, "Customer service and stakeholder communication", profile)
     assert strong["score_method"] == rank.SCORE_VERSION
     assert strong["score"] > weak["score"]
-    assert strong["score_role"] == 27 and strong["score_location"] == 10
-    assert strong["score_skills"] == 30
+    assert strong["score_role"] == 18 and strong["score_location"] == 5
+    assert strong["score_skills"] == 60
     assert strong["competences_reperees"] == ["AWS", "Terraform", "Kubernetes", "Linux"]
-    assert strong["score"] == 67
-    assert "mentionne 4 compétences de votre CV" in strong["resume"]
-    assert "Aucune des 8 compétences clés" in weak["resume"]
+    assert strong["score"] == 87
+    assert "Aucune compétence reconnue" in weak["resume"]
+
+
+def test_fit_uses_offer_skills_and_target_experience():
+    profile = "AWS Terraform Kubernetes Docker Linux Ansible Python Bash Grafana Observability SRE SLO"
+    job = {"job_title": "SRE", "area": "Sydney NSW", "region": "Australia"}
+    description = "Grafana, observability and SLOs. No AWS experience required. Datadog is preferred."
+    junior = rank.calculate_fit_score(job, description + " 2 years of experience.", profile)
+    more_experienced = rank.calculate_fit_score(job, description + " 4 years of experience.", profile)
+    assert junior["competences_reperees"] == ["Grafana", "Observability", "SLI/SLO"]
+    assert junior["competences_manquantes"] == ["Datadog"]
+    assert junior["competences_comparees"] == 4
+    assert junior["score"] - more_experienced["score"] == 7
+
+
+def test_unavailable_model_keeps_score_and_source_evidence():
+    description = "2 years of experience with AWS. Visa sponsorship is unavailable."
+    with patch.object(rank.requests, "post", side_effect=rank.requests.ConnectionError):
+        result = rank.analyze({"job_title": "Cloud Engineer"}, description, "AWS", "test")
+    assert result["score_skills"] > 0
+    assert result["preuve_visa"] in description
+    assert not result["points_forts"]
 
 
 def test_description_keeps_bullet_boundaries_for_experience_filter():
     description = rank.description_text("<ul><li>Customer experience focus</li><li>5 years warranty</li><li>Minimum 2 years of experience in support</li></ul>")
     assert "Customer experience focus\n5 years warranty" in description
     assert rank.experience_exclusion(description) is None
+    wrapped = rank.description_text("<p>Minimum <b>5 years’</b> experience in DevOps.</p>")
+    assert rank.experience_exclusion(wrapped)
+    assert rank.experience_exclusion("5 years of experience is optional.") is None
+    assert rank.experience_exclusion("5 years of experience (not mandatory).") is None
 
 
 def test_rejects_invented_evidence():
@@ -181,7 +205,7 @@ def test_search_targets_all_titles_and_australia():
 def test_resume_preserves_existing_and_skips_it(tmp_path):
     jobs = tmp_path / "jobs.jsonl"
     report = tmp_path / "report.md"
-    existing = {"offre": {"job_id": "1", "job_title": "Cloud"}, "analyse": {"score": 70, "score_method": rank.SCORE_VERSION, "resume": "OK", "points_forts": [], "points_a_verifier": [], "experience": "non précisé", "preuve_experience": "non précisé", "visa_sponsoring": "non précisé", "preuve_visa": "non précisé"}}
+    existing = {"offre": {"job_id": "1", "job_title": "Cloud"}, "analyse": {"score": 70, "score_method": rank.SCORE_VERSION, "profile_fingerprint": rank.profile_fingerprint(""), "resume": "OK", "points_forts": [], "points_a_verifier": [], "experience": "non précisé", "preuve_experience": "non précisé", "visa_sponsoring": "non précisé", "preuve_visa": "non précisé"}}
     jobs.write_text('\n'.join(json.dumps(job) for job in [existing["offre"], {"job_id": "2", "job_title": "Cloud"}, {"job_id": "3", "job_title": "Senior Cloud"}]), encoding="utf-8")
     report.with_suffix('.json').write_text(json.dumps({"analyses": [existing], "echecs": []}), encoding="utf-8")
     with patch('sys.argv', ['local_rank', str(jobs), str(report), '--resume', '--limit', '1']), \
@@ -207,3 +231,22 @@ def test_exclusion_survives_resume_without_calling_model(tmp_path):
     data = json.loads(report.with_suffix('.json').read_text(encoding='utf-8'))
     assert len(data['exclusions']) == 1 and data['exclusions'][0]['job']['job_id'] == '10'
 
+
+def test_resume_rescores_cached_description_with_new_cv(tmp_path):
+    jobs, report, profile = (tmp_path / name for name in ("jobs.jsonl", "report.md", "profile.txt"))
+    job = {"job_id": "10", "job_title": "Cloud Engineer"}
+    description = "Requires 2 years of experience with AWS, Azure and Terraform."
+    jobs.write_text(json.dumps(job), encoding="utf-8")
+    profile.write_text("Terraform", encoding="utf-8")
+    old_result = rank.refresh_existing_analysis({}, job, description, "AWS")
+    report.with_suffix(".json").write_text(json.dumps({"analyses": [
+        {"offre": job, "analyse": old_result, "description": description}
+    ]}), encoding="utf-8")
+    with patch("sys.argv", ["local_rank", str(jobs), str(report), "--resume", "--profile", str(profile)]), \
+         patch.object(rank.fetcher, "fetch_job_detail") as fetch, patch.object(rank, "analyze") as model:
+        rank.main()
+    fetch.assert_not_called()
+    model.assert_not_called()
+    analysis = json.loads(report.with_suffix(".json").read_text())["analyses"][0]["analyse"]
+    assert analysis["competences_reperees"] == ["Terraform"]
+    assert analysis["profile_fingerprint"] == rank.profile_fingerprint("Terraform")

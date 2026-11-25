@@ -13,7 +13,7 @@ def test_state_shows_live_analyses_without_duplicates(tmp_path):
     report = tmp_path / "analysis.md"
     report.write_text("## 82/100 — Cloud\n\n[Employer — Sydney](https://www.seek.com.au/job/12)\n\nPertinent.\n\n**Points forts :** AWS; Linux\n\n**À vérifier :** Visa\n\n**Expérience :** non précisé\n\n**Visa / sponsoring :** non précisé\n", encoding="utf-8")
     report.with_suffix('.json').write_text(json.dumps({"analyses": [{"offre": {"job_id": "12"}, "analyse": {
-        "score": 82, "score_method": server.SCORE_VERSION, "resume": "Pertinent.",
+        "score": 82, "score_method": server.SCORE_VERSION, "profile_fingerprint": server.profile_fingerprint(""), "resume": "Pertinent.",
         "points_forts": ["AWS", "Linux"], "points_a_verifier": ["Visa"]}}]}), encoding="utf-8")
     state = server.state(jobs, report, 20, "")
     assert len(state["jobs"]) == 1
@@ -55,7 +55,7 @@ def test_state_hides_misleading_evidence_from_older_results(tmp_path):
 def test_stale_failures_do_not_block_finished_status(tmp_path):
     jobs, report = tmp_path / 'jobs.jsonl', tmp_path / 'report.md'
     jobs.write_text(json.dumps({'job_id': '1', 'job_title': 'Cloud Engineer'}), encoding='utf-8')
-    data = {'analyses': [{'offre': {'job_id': '1'}, 'analyse': {'score': 45, 'score_method': server.SCORE_VERSION}}],
+    data = {'analyses': [{'offre': {'job_id': '1'}, 'analyse': {'score': 45, 'score_method': server.SCORE_VERSION, 'profile_fingerprint': server.profile_fingerprint('')}}],
             'echecs': [{'job': {'job_id': '999'}, 'status': 'not_found'}]}
     report.with_suffix('.json').write_text(json.dumps(data), encoding='utf-8')
     progress = server.state(jobs, report, 1, '')['progress']
@@ -84,3 +84,25 @@ def test_state_hides_legacy_model_score_and_offers_recalculation(tmp_path):
     assert state['analyses']['1']['score'] is None
     assert state['progress']['stale'] == 1 and state['progress']['completed'] == 0
     assert state['progress']['can_start']
+
+
+def test_show_professional_profile_and_hide_score_after_cv_changes(tmp_path):
+    jobs, report, profile = (tmp_path / name for name in ("jobs.jsonl", "report.md", "profile.txt"))
+    cv = "Private Name – hidden@example.com\nSKILLS\nCloud: AWS\nLanguages: French (native)\n"
+    profile.write_text(cv, encoding="utf-8")
+    jobs.write_text(json.dumps({"job_id": "1", "job_title": "Cloud Engineer"}), encoding="utf-8")
+    report.with_suffix(".json").write_text(json.dumps({"analyses": [
+        {"offre": {"job_id": "1"}, "analyse": {
+            "score": 68, "score_method": server.SCORE_VERSION, "profile_fingerprint": server.profile_fingerprint(cv)}}
+    ]}), encoding="utf-8")
+    payload = server.state(jobs, report, 1, "", profile)
+    assert payload["analyses"]["1"]["score"] == 68
+    assert payload["profile"]["skills"] == ["AWS"]
+    assert payload["profile"]["languages"] == ["French (native)"]
+    assert "hidden@example.com" not in json.dumps(payload)
+    assert "profile_fingerprint" not in json.dumps(payload)
+    profile.write_text(cv.replace("AWS", "Terraform"), encoding="utf-8")
+    updated = server.state(jobs, report, 1, "", profile)
+    assert updated["profile"]["skills"] == ["Terraform"]
+    assert updated["analyses"]["1"]["score"] is None
+    assert updated["progress"]["stale"] == 1 and updated["progress"]["can_start"]

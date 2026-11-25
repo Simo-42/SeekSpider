@@ -7,6 +7,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
+from cv_profile import profile_fingerprint, profile_summary
 from job_filters import (SCORE_VERSION, experience_evidence, experience_exclusion,
                          is_senior, is_target_role, role_category)
 
@@ -64,11 +65,17 @@ def container_running(container):
 
 
 def state(jobs_path, report, total, container, profile=None):
+    try:
+        profile_text = profile.read_text(encoding="utf-8") if profile else ""
+    except (OSError, UnicodeError):
+        profile_text = ""
+    fingerprint = profile_fingerprint(profile_text)
     all_jobs = read_jobs(jobs_path, include_senior=True)
     analyses = read_analyses(report)
     for job_id, analysis in list(analyses.items()):
         updated = dict(analysis)
-        updated["score_obsolete"] = updated.get("score_method") != SCORE_VERSION
+        saved_fingerprint = updated.pop("profile_fingerprint", None)
+        updated["score_obsolete"] = updated.get("score_method") != SCORE_VERSION or saved_fingerprint != fingerprint
         if updated["score_obsolete"]:
             updated["score"] = None
         updated.setdefault("habilitation", "Aucune mention repérée automatiquement : vérifie l'annonce.")
@@ -99,8 +106,9 @@ def state(jobs_path, report, total, container, profile=None):
         job["role_category"] = role_category(job)
     visible_ids = {str(job["job_id"]) for job in jobs}
     analyses = {job_id: analysis for job_id, analysis in analyses.items() if job_id in visible_ids}
-    failures = len((failed_ids & visible_ids) - analyses.keys())
-    completed = sum(analysis.get("score_method") == SCORE_VERSION for analysis in analyses.values())
+    current_ids = {job_id for job_id, analysis in analyses.items() if not analysis["score_obsolete"]}
+    failures = len((failed_ids & visible_ids) - current_ids)
+    completed = len(current_ids)
     stale = len(analyses) - completed
     pending = len(jobs) - completed
     if running:
@@ -111,13 +119,13 @@ def state(jobs_path, report, total, container, profile=None):
         status = "stopped"
         message = (f"Analyse en pause : {stale} score(s) à recalculer, {pending - stale} offre(s) à analyser, {failures} échec(s) à réessayer" if pending or failures
                    else "Analyse en pause ; les résultats enregistrés sont conservés")
-    return {"jobs": jobs, "analyses": analyses,
+    return {"jobs": jobs, "analyses": analyses, "profile": profile_summary(profile_text),
             "progress": {"completed": completed, "total": len(jobs), "status": status, "message": message,
                          "excluded": len(all_jobs) - len(jobs),
                          "stale": stale,
                          "pending": pending,
                          "failed": failures,
-                         "can_start": bool(profile and profile.is_file() and jobs and not running and completed < len(jobs)),
+                         "can_start": bool(profile_text.strip() and jobs and not running and completed < len(jobs)),
                          "can_stop": running}}
 
 
@@ -171,8 +179,9 @@ def main():
                         if not current["progress"]["can_start"]:
                             raise ValueError("Démarrage impossible : profil manquant, aucune offre restante ou analyse déjà active.")
                         project = Path(__file__).resolve().parent
+                        network = ["--network", "container:seekspider-ollama"] if container_running("seekspider-ollama") else []
                         command = ["docker", "run", "-d", "--rm", "--name", container,
-                            "--network", "container:seekspider-ollama", "--entrypoint", "python",
+                            *network, "--entrypoint", "python",
                             "-v", f"{project}:/src:ro", "-v", f"{args.jobs.resolve()}:/data/jobs.jsonl:ro",
                             "-v", f"{args.report.resolve().parent}:/results",
                             "-v", f"{args.profile.resolve()}:/private/profile.txt:ro", "seekspider-run",
@@ -180,7 +189,7 @@ def main():
                             "--profile", "/private/profile.txt", "--limit", "1000000", "--resume"]
                         result = subprocess.run(command, capture_output=True, text=True, timeout=30)
                         if result.returncode:
-                            raise ValueError("Impossible de lancer l'analyse. Vérifie que Docker, Ollama et l'image seekspider-run sont démarrés.")
+                            raise ValueError("Impossible de lancer l'analyse. Vérifie Docker et la présence de l'image seekspider-run.")
                     elif route == "/api/analysis/stop":
                         if not container_running(container):
                             raise ValueError("Aucune analyse active.")

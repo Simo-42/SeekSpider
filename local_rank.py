@@ -8,7 +8,8 @@ import time
 from pathlib import Path
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
+from cv_profile import calculate_fit_score, profile_fingerprint, profile_summary
 from job_filters import (SCORE_VERSION, experience_evidence, experience_exclusion,
                          is_senior, is_target_role, role_category, role_tier)
 
@@ -99,79 +100,6 @@ def attach_source_evidence(result, description):
     return result
 
 
-SKILL_PATTERNS = {
-    "AWS": r"\baws\b|amazon web services",
-    "Terraform": r"\bterraform\b",
-    "Kubernetes": r"\bkubernetes\b|\bk8s\b|\bk3s\b|\bk3d\b",
-    "Docker": r"\bdocker\b|\bcontaineri[sz]ation\b",
-    "Linux": r"\blinux\b",
-    "Ansible": r"\bansible\b",
-    "Python": r"\bpython\b",
-    "Bash": r"\bbash\b",
-    "GitLab CI/CD": r"\bgitlab\s+ci/?cd\b",
-    "GitHub Actions": r"\bgithub\s+actions\b",
-    "Argo CD": r"\bargo\s*cd\b|\bargocd\b",
-    "Helm": r"\bhelm\b",
-    "Grafana": r"\bgrafana\b",
-    "Observability": r"\bobservability\b|\bobservabilit[ée]\b",
-    "SRE": r"\bsre\b|site reliability engineering",
-    "Incident management": r"incident management|incident response|incident workflow",
-    "SLI/SLO": r"\bsli(?:s)?\b|\bslo(?:s)?\b",
-    "CloudWatch": r"\bcloudwatch\b",
-    "AWS Lambda": r"\blambda\b",
-    "API Gateway": r"\bapi gateway\b",
-    "CI/CD": r"\bci\s*/?\s*cd\b|continuous integration|continuous delivery",
-    "FastAPI": r"\bfastapi\b",
-    "MCP": r"\bmcp servers?\b|model context protocol",
-    "IA générative / agentique": r"\bagentic ai\b|\bgenai\b|generative ai|\bllm(?:ops|s?)\b",
-}
-ROLE_SKILLS = {
-    "Cloud & DevOps": ("AWS", "Terraform", "Kubernetes", "Docker", "Linux", "Ansible", "Python", "Bash", "GitLab CI/CD", "GitHub Actions", "Argo CD", "Helm", "Grafana", "Observability", "SRE", "Incident management", "SLI/SLO", "CloudWatch", "AWS Lambda", "API Gateway", "CI/CD"),
-    "Infrastructure": ("AWS", "Terraform", "Kubernetes", "Docker", "Linux", "Ansible", "Python", "Bash", "Grafana", "Observability", "Incident management", "CloudWatch", "CI/CD"),
-    "Support IT": ("AWS", "Linux", "Python", "Bash", "Grafana", "Incident management", "CloudWatch", "CI/CD"),
-    "IA complémentaire": ("AWS", "Docker", "Kubernetes", "Python", "Terraform", "Grafana", "Observability", "FastAPI", "MCP", "IA générative / agentique"),
-}
-
-
-def format_fit_summary(category, matched, comparison_count):
-    if matched:
-        noun = "compétence" if len(matched) == 1 else "compétences"
-        return (f"Famille « {category} ». L'annonce mentionne {len(matched)} {noun} de votre CV : "
-                f"{', '.join(matched)}. Ce sont des mentions, pas une confirmation du niveau requis.")
-    if comparison_count:
-        return (f"Famille « {category} ». Aucune des {comparison_count} compétences clés de votre CV comparées "
-                "n'apparaît dans le texte récupéré ; vérifiez l'annonce complète.")
-    return f"Famille « {category} ». Aucune compétence issue du CV n'a pu être comparée ; vérifiez le profil chargé."
-
-
-def calculate_fit_score(job, description, profile):
-    """Transparent heuristic: target role (30), CV skill overlap (60), location (10)."""
-    category = role_category(job)
-    tier = role_tier(job)
-    role_points = 30 if tier == 0 else {
-        "Cloud & DevOps": 27, "Infrastructure": 24, "Support IT": 21,
-        "IA complémentaire": 16,
-    }.get(category, 0)
-    relevant = [skill for skill in ROLE_SKILLS.get(category, ())
-                if re.search(SKILL_PATTERNS[skill], profile, re.I)][:8]
-    matched = [skill for skill in relevant if re.search(SKILL_PATTERNS[skill], description, re.I)]
-    comparison_count = len(relevant)
-    skill_points = round(60 * min(len(matched), comparison_count) / comparison_count) if comparison_count else 0
-    area = (job.get("area") or "").lower()
-    region = (job.get("region") or "").lower()
-    location_points = 10 if "sydney" in area or "melbourne" in area else (6 if "australia" in region else 0)
-    return {
-        "resume": format_fit_summary(category, matched, comparison_count),
-        "score": role_points + skill_points + location_points,
-        "score_method": SCORE_VERSION,
-        "role_category": category,
-        "score_role": role_points,
-        "score_skills": skill_points,
-        "score_location": location_points,
-        "competences_reperees": matched,
-        "competences_comparees": comparison_count,
-    }
-
 
 def select_jobs(path, limit=None):
     unique = {}
@@ -202,36 +130,49 @@ aucun détail et ne résume pas le CV.
 Champs JSON obligatoires : points_forts (liste de textes), points_a_verifier
 (liste de textes).
 
-PROFIL :\n{profile}\n\nMÉTADONNÉES DE L'OFFRE :\n{json.dumps({k: job.get(k, '') for k in ('job_title', 'business_name', 'area', 'work_type', 'pay_range')}, ensure_ascii=False)}\n\nDESCRIPTION :\n{description[:8000]}"""
-    response = requests.post("http://127.0.0.1:11434/api/chat", json={
-        "model": model, "stream": False, "think": False, "format": "json",
-        "options": {"temperature": 0, "num_ctx": 8192, "num_predict": 600},
-        "messages": [{"role": "user", "content": prompt}],
-    }, timeout=300)
-    response.raise_for_status()
-    result = json.loads(response.json()["message"]["content"])
-    for field in ("points_forts", "points_a_verifier"):
-        if not isinstance(result.get(field), list) or not all(isinstance(x, str) for x in result[field]):
-            raise ValueError(f"Liste invalide : {field}")
-    result = attach_source_evidence(result, description)
-    result.update(calculate_fit_score(job, description, profile))
-    result["modele"] = model
-    return result
+PROFIL :\n{json.dumps(profile_summary(profile), ensure_ascii=False) if profile else PROFILE}\n\nMÉTADONNÉES DE L'OFFRE :\n{json.dumps({k: job.get(k, '') for k in ('job_title', 'business_name', 'area', 'work_type', 'pay_range')}, ensure_ascii=False)}\n\nDESCRIPTION :\n{description[:8000]}"""
+    notes = {"points_forts": [], "points_a_verifier": []}
+    try:
+        response = requests.post("http://127.0.0.1:11434/api/chat", json={
+            "model": model, "stream": False, "think": False, "format": "json",
+            "options": {"temperature": 0, "num_ctx": 8192, "num_predict": 600},
+            "messages": [{"role": "user", "content": prompt}],
+        }, timeout=90)
+        response.raise_for_status()
+        parsed = json.loads(response.json()["message"]["content"])
+        for field in ("points_forts", "points_a_verifier"):
+            if not isinstance(parsed[field], list) or not all(isinstance(item, str) for item in parsed[field]):
+                raise ValueError(f"Liste invalide : {field}")
+        notes.update({field: parsed[field][:2] for field in notes})
+        notes["modele"] = model
+    except (requests.RequestException, ValueError, KeyError, TypeError):
+        notes["modele"] = "Notes IA indisponibles"
+    return refresh_existing_analysis(notes, job, description, profile)
 
 
 def refresh_existing_analysis(analysis, job, description, profile):
     """Replace a legacy model score and refresh source evidence without another LLM call."""
+    score = calculate_fit_score(job, description, profile)
+    if analysis.get("profile_fingerprint") not in (None, score["profile_fingerprint"]):
+        analysis = {"points_forts": [], "points_a_verifier": [], "modele": "Notes IA à revoir après changement du CV"}
     result = attach_source_evidence(analysis, description)
-    result.update(calculate_fit_score(job, description, profile))
+    result.update(score)
     return result
 
 
 def description_text(html):
-    return BeautifulSoup(html, "html.parser").get_text("\n", strip=True)
+    soup = BeautifulSoup(html, "html.parser")
+    for node in soup.find_all(string=True):
+        if type(node) is NavigableString:
+            node.replace_with(re.sub(r"\s+", " ", node))
+    for block in soup.find_all(["br", "p", "div", "li", "h1", "h2", "h3", "h4", "tr"]):
+        block.insert_before("\n")
+        block.insert_after("\n")
+    return "\n".join(line.strip() for line in soup.get_text(" ").splitlines() if line.strip())
 
 
 def render(results, output):
-    lines = ["# Analyse locale des offres SEEK", "", "Score de règles SeekSpider : famille de poste, compétences du CV repérées dans l'annonce et priorité de localisation. Ce score ne vérifie ni le visa ni le caractère obligatoire des compétences.", ""]
+    lines = ["# Analyse locale des offres SEEK", "", "Score de règles SeekSpider : famille de poste, compétences du CV, expérience demandée et localisation. Ce score ne vérifie ni le visa ni le caractère obligatoire des compétences.", ""]
     visible_results = [row for row in results
                        if is_target_role(row.get("offre", {}))
                        and not is_senior(row.get("offre", {}))
@@ -241,7 +182,7 @@ def render(results, output):
         score_heading = f"{a['score']}/100" if a.get("score_method") == SCORE_VERSION else "Score à recalculer"
         lines += [f"## {score_heading} — {job.get('job_title', '')}", "",
                   f"[{job.get('business_name', '')} — {job.get('area', '')}]({job.get('url', '')})", "",
-                  f"**Famille :** {a.get('role_category', role_category(job))} — **Détail :** rôle {a.get('score_role', '—')}/30, compétences du CV {a.get('score_skills', '—')}/60, localisation {a.get('score_location', '—')}/10", "",
+                  f"**Famille :** {a.get('role_category', role_category(job))} — **Détail :** rôle {a.get('score_role', '—')}/20, compétences du CV {a.get('score_skills', '—')}/65, expérience {a.get('score_experience', '—')}/10, localisation {a.get('score_location', '—')}/5", "",
                   "**Compétences du CV repérées :** " + (", ".join(a.get("competences_reperees", [])) or "aucune"), "",
                   a["resume"], "", "**Points forts :** " + "; ".join(a["points_forts"]), "",
                   "**À vérifier :** " + "; ".join(a["points_a_verifier"]), "",
@@ -274,9 +215,8 @@ def main():
     args = parser.parse_args()
     if args.limit < 1:
         parser.error("--limit doit être positif")
-    profile = PROFILE
-    if args.profile:
-        profile += "\n\nCV FOURNI :\n" + args.profile.read_text(encoding="utf-8")
+    profile = args.profile.read_text(encoding="utf-8") if args.profile else ""
+    fingerprint = profile_fingerprint(profile)
     results, failures, exclusions = [], [], []
     saved = args.output.with_suffix(".json")
     if args.resume and saved.exists():
@@ -291,13 +231,20 @@ def main():
     existing = {str(row["offre"]["job_id"]): row for row in results}
     excluded_ids = {str(row["job"]["job_id"]) for row in exclusions}
     stale = [job for job in jobs if str(job["job_id"]) in existing
-             and existing[str(job["job_id"])].get("analyse", {}).get("score_method") != SCORE_VERSION
+             and (existing[str(job["job_id"])]["analyse"].get("score_method") != SCORE_VERSION
+                  or existing[str(job["job_id"])]["analyse"].get("profile_fingerprint") != fingerprint)
              and str(job["job_id"]) not in excluded_ids]
     new = [job for job in jobs if str(job["job_id"]) not in existing
            and str(job["job_id"]) not in excluded_ids]
     jobs = (stale + new)[:args.limit]
     for i, job in enumerate(jobs, 1):
-        html, _, status = fetcher.fetch_job_detail(job["job_id"])
+        job_id = str(job["job_id"])
+        description = existing.get(job_id, {}).get("description")
+        fetched = not description
+        if fetched:
+            html, _, status = fetcher.fetch_job_detail(job["job_id"])
+        else:
+            status = "success"
         if status != "success":
             failures.append({"job": job, "status": status})
             save_results(args.output, results, failures, exclusions)
@@ -307,7 +254,8 @@ def main():
                 break
             time.sleep(1)
             continue
-        description = description_text(html)
+        if fetched:
+            description = description_text(html)
         reason = experience_exclusion(description)
         if reason:
             results = [row for row in results if str(row["offre"]["job_id"]) != str(job["job_id"])]
@@ -315,25 +263,27 @@ def main():
             exclusions.append({"job": job, "reason": reason})
             save_results(args.output, results, failures, exclusions)
             print(f"{i}/{len(jobs)} {job['job_id']}: exclue (5 ans ou plus)", flush=True)
-            time.sleep(1)
+            if fetched:
+                time.sleep(1)
             continue
         try:
-            job_id = str(job["job_id"])
             if job_id in existing:
                 refreshed = refresh_existing_analysis(existing[job_id]["analyse"], job, description, profile)
                 for row in results:
                     if str(row["offre"]["job_id"]) == job_id:
-                        row["offre"], row["analyse"] = job, refreshed
+                        row.update(offre=job, analyse=refreshed, description=description)
                         break
             else:
-                results.append({"offre": job, "analyse": analyze(job, description, profile, args.model)})
+                results.append({"offre": job, "analyse": analyze(job, description, profile, args.model),
+                                "description": description})
             save_results(args.output, results, failures, exclusions)
             print(f"{i}/{len(jobs)} {job['job_id']}: {'score recalculé' if job_id in existing else 'analysée'}", flush=True)
         except (requests.RequestException, ValueError, KeyError, TypeError) as exc:
             failures.append({"job": job, "status": str(exc)})
             save_results(args.output, results, failures, exclusions)
             print(f"{i}/{len(jobs)} {job['job_id']}: analyse impossible ({exc})", flush=True)
-        time.sleep(1)
+        if fetched:
+            time.sleep(1)
     save_results(args.output, results, failures, exclusions)
     print(f"Terminé : {len(results)} analysées, {len(failures)} échecs.", flush=True)
 

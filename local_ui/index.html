@@ -366,6 +366,56 @@
       font-weight: 600;
     }
 
+    .profile-panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+    }
+
+    .profile-panel summary {
+      cursor: pointer;
+      padding: 11px 16px;
+      border-radius: var(--radius-lg);
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .profile-panel summary:hover {
+      background: var(--bg-surface-hover);
+    }
+
+    .profile-body {
+      padding: 14px 16px 16px;
+      border-top: 1px solid var(--border-subtle);
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr));
+      gap: 12px 24px;
+      overflow-wrap: anywhere;
+    }
+
+    .profile-body h3,
+    .profile-body p {
+      margin: 0;
+      font-size: inherit;
+    }
+
+    .profile-body h3 {
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .profile-body ul {
+      margin: 0;
+      padding-inline-start: 1.1em;
+    }
+
+    .profile-skills,
+    .profile-empty {
+      grid-column: 1 / -1;
+    }
+
     .progress-panel {
       background: var(--bg-surface);
       border: 1px solid var(--border-subtle);
@@ -1014,6 +1064,35 @@
       color: var(--text-secondary);
     }
 
+    .score-breakdown {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 126px), 1fr));
+      gap: 6px 14px;
+      margin: 0 0 4px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: 0.8125rem;
+    }
+
+    .score-breakdown div {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 6px;
+    }
+
+    .score-breakdown dt {
+      color: var(--text-secondary);
+    }
+
+    .score-breakdown dd {
+      margin: 0;
+      color: var(--text-primary);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
     .detail-block {
       display: flex;
       flex-direction: column;
@@ -1341,10 +1420,16 @@
           <line x1="12" y1="17" x2="12.01" y2="17"></line>
         </svg>
         <div>
-          <strong>Score transparent :</strong> calculé à partir de la famille de poste, des compétences repérées dans votre CV et de la ville. LFM3 fournit des pistes de lecture, pas la note. Les postes hors cible sont écartés.
-          <strong>Visa et habilitations restent à vérifier</strong> dans l'annonce officielle SEEK ; aucune éligibilité n'est déduite.
+          <strong>Visa et habilitations restent à vérifier</strong> dans l’annonce officielle SEEK.
         </div>
       </div>
+
+      <details class="profile-panel">
+        <summary>Mon profil CV</summary>
+        <div class="profile-body" id="profile-body">
+          <p class="profile-empty">Chargement du profil local…</p>
+        </div>
+      </details>
 
       <section class="controls-panel" aria-label="Recherche, filtres et tri">
         <div class="control-group search-group">
@@ -1454,6 +1539,7 @@
       const API_STOP_URL = "/api/analysis/stop";
 
       let activeFetchPromise = null;
+      let profileSignature = "";
 
       const state = {
         jobs: [],
@@ -1504,6 +1590,7 @@
         counterExcluded: document.getElementById("counter-excluded"),
         progressBar: document.getElementById("progress-bar"),
         progressFill: document.getElementById("progress-fill"),
+        profileBody: document.getElementById("profile-body"),
         searchInput: document.getElementById("search-input"),
         clearSearchBtn: document.getElementById("clear-search-btn"),
         regionBtns: Array.from(document.querySelectorAll("[data-region]")),
@@ -1539,6 +1626,53 @@
           if (item) out.push(item);
         }
         return out;
+      }
+
+      function renderProfile(profile) {
+        const groups = [
+          ["education", "Formation"],
+          ["certifications", "Certifications"],
+          ["experience", "Expérience et projets"],
+          ["languages", "Langues"],
+          ["skills", "Compétences repérées dans le CV"]
+        ].map(([key, label]) => [key, label, asStringList(profile && profile[key])]);
+        const signature = JSON.stringify([Boolean(profile), groups]);
+        if (signature === profileSignature) return;
+        profileSignature = signature;
+        els.profileBody.replaceChildren();
+
+        if (!groups.some(([, , items]) => items.length)) {
+          const message = document.createElement("p");
+          message.className = "profile-empty";
+          message.textContent = profile
+            ? "Aucune caractéristique reconnue dans le CV chargé."
+            : "Aucun CV chargé. Démarrez SeekSpider avec un CV au format texte.";
+          els.profileBody.appendChild(message);
+          return;
+        }
+
+        for (const [key, label, items] of groups) {
+          if (!items.length) continue;
+          const group = document.createElement("section");
+          const heading = document.createElement("h3");
+          heading.textContent = label;
+          group.appendChild(heading);
+          if (key === "skills") {
+            group.className = "profile-skills";
+            const content = document.createElement("p");
+            content.textContent = items.join(" · ");
+            group.appendChild(content);
+          } else {
+            const list = document.createElement("ul");
+            for (const item of items) {
+              const entry = document.createElement("li");
+              entry.textContent = item;
+              list.appendChild(entry);
+            }
+            group.appendChild(list);
+          }
+          els.profileBody.appendChild(group);
+        }
       }
 
       function getSafeSeekUrl(rawUrl) {
@@ -1625,9 +1759,8 @@
 
       function normalizeAnalysis(raw) {
         if (!raw || typeof raw !== "object") return null;
-        const rawScore = Number(raw.score);
-        const hasScore = raw.score !== null && raw.score !== undefined
-          && raw.score_method === "cv-rules-v1" && Number.isFinite(rawScore) && rawScore >= 0 && rawScore <= 100;
+        const rawScore = raw.score;
+        const hasScore = !raw.score_obsolete && Number.isFinite(rawScore) && rawScore >= 0 && rawScore <= 100;
         return {
           score: hasScore ? Math.round(rawScore) : null,
           score_method: asText(raw.score_method, ""),
@@ -1635,8 +1768,11 @@
           role_category: asText(raw.role_category, "Famille non classée"),
           score_role: Number.isFinite(Number(raw.score_role)) ? Number(raw.score_role) : null,
           score_skills: Number.isFinite(Number(raw.score_skills)) ? Number(raw.score_skills) : null,
-          score_location: Number.isFinite(Number(raw.score_location)) ? Number(raw.score_location) : null,
+          score_location: Number.isFinite(raw.score_location) ? raw.score_location : null,
+          score_experience: Number.isFinite(raw.score_experience) ? raw.score_experience : null,
+          experience_score_reason: asText(raw.experience_score_reason, ""),
           competences_reperees: asStringList(raw.competences_reperees),
+          competences_manquantes: asStringList(raw.competences_manquantes),
           competences_comparees: Math.max(0, Number(raw.competences_comparees) || 0),
           modele: asText(raw.modele, "Modèle non renseigné"),
           resume: asText(raw.resume, "Non précisé"),
@@ -1714,14 +1850,15 @@
         ];
         if (analysis) {
           haystacks.push(
-            analysis.resume,
             analysis.experience,
             analysis.preuve_experience,
             analysis.visa_sponsoring,
-            analysis.preuve_visa,
-            analysis.points_forts.join(" "),
-            analysis.points_a_verifier.join(" ")
+            analysis.preuve_visa
           );
+          if (analysis.score !== null) {
+            haystacks.push(analysis.resume, ...analysis.competences_reperees, ...analysis.competences_manquantes,
+              ...analysis.points_forts, ...analysis.points_a_verifier);
+          }
         }
         return haystacks.join(" ").toLowerCase().includes(query);
       }
@@ -2066,7 +2203,7 @@
             badge.title = "Score indicatif sur 100";
           } else if (analysis) {
             badge.className = "score-badge";
-            badge.textContent = "Analysée";
+            badge.textContent = "À recalculer";
           } else {
             badge.className = "score-badge score-pending";
             badge.textContent = "Non analysée";
@@ -2115,7 +2252,7 @@
 
           btn.appendChild(metaRow);
 
-          if (analysis && analysis.resume && analysis.resume !== "Non précisé") {
+          if (analysis && analysis.score !== null && analysis.resume !== "Non précisé") {
             const snippet = document.createElement("p");
             snippet.className = "job-snippet";
             snippet.textContent = analysis.resume;
@@ -2312,8 +2449,8 @@
         const scoreNote = document.createElement("p");
         scoreNote.className = "score-indicative-note";
         scoreNote.textContent = analysis.score !== null
-          ? "Règles locales · LFM3 fournit les pistes de lecture, pas la note."
-          : (analysis.score_stale ? "Ancienne note IA masquée ; démarrez l'analyse pour recalculer." : "Vérifiez toujours l'annonce complète.");
+          ? "Score calculé avec votre CV et le texte de l’annonce."
+          : "Relancez l’analyse pour obtenir le score à jour.";
 
         scoreBox.appendChild(scoreLeft);
         scoreBox.appendChild(scoreNote);
@@ -2323,18 +2460,45 @@
         methodBox.className = "score-method-box";
         const methodH3 = document.createElement("h3");
         methodH3.textContent = analysis.score !== null ? "Détail du score" : "Score à recalculer";
-        const methodP = document.createElement("p");
-        if (analysis.score !== null) {
-          methodP.textContent = "Famille « " + analysis.role_category + " » : " + analysis.score_role + "/30 · compétences clés du CV repérées : " + analysis.competences_reperees.length + "/" + analysis.competences_comparees + " (" + analysis.score_skills + "/60) · localisation : " + analysis.score_location + "/10. Maximum 8 compétences comparées. Le visa, les habilitations et le caractère obligatoire des compétences ne sont pas notés.";
-        } else {
-          methodP.textContent = "Cette ancienne note était générée par le modèle et n'est pas assez fiable. Démarrez l'analyse pour obtenir le score calculé selon vos critères.";
-        }
         methodBox.appendChild(methodH3);
-        methodBox.appendChild(methodP);
-        if (analysis.score !== null && analysis.competences_reperees.length) {
-          const skillsP = document.createElement("p");
-          skillsP.textContent = "Repérées dans l'annonce : " + analysis.competences_reperees.join(", ") + ".";
-          methodBox.appendChild(skillsP);
+        if (analysis.score !== null) {
+          const breakdown = document.createElement("dl");
+          breakdown.className = "score-breakdown";
+          for (const [label, value, max] of [
+            ["Compétences", analysis.score_skills, 65],
+            ["Poste", analysis.score_role, 20],
+            ["Expérience", analysis.score_experience, 10],
+            ["Ville", analysis.score_location, 5]
+          ]) {
+            const line = document.createElement("div");
+            const term = document.createElement("dt");
+            const points = document.createElement("dd");
+            term.textContent = label;
+            points.textContent = value === null ? "—" : value + " / " + max;
+            line.append(term, points);
+            breakdown.appendChild(line);
+          }
+          methodBox.appendChild(breakdown);
+
+          const skills = document.createElement("p");
+          skills.textContent = analysis.competences_comparees
+            ? "En commun (" + analysis.competences_reperees.length + " sur " + analysis.competences_comparees + ") : " + (analysis.competences_reperees.join(", ") || "aucune") + "."
+            : "Aucune compétence reconnue dans le texte de l’annonce.";
+          methodBox.appendChild(skills);
+          if (analysis.competences_manquantes.length) {
+            const missing = document.createElement("p");
+            missing.textContent = "Dans l’annonce, absentes du CV chargé : " + analysis.competences_manquantes.join(", ") + ".";
+            methodBox.appendChild(missing);
+          }
+          if (analysis.experience_score_reason) {
+            const reason = document.createElement("p");
+            reason.textContent = analysis.experience_score_reason;
+            methodBox.appendChild(reason);
+          }
+        } else {
+          const message = document.createElement("p");
+          message.textContent = "Cette note a été calculée avec un autre CV ou un ancien barème.";
+          methodBox.appendChild(message);
         }
         section.appendChild(methodBox);
 
@@ -2347,7 +2511,7 @@
         resumeP.textContent = analysis.resume;
         resumeBlock.appendChild(resumeH3);
         resumeBlock.appendChild(resumeP);
-        section.appendChild(resumeBlock);
+        if (analysis.score !== null) section.appendChild(resumeBlock);
 
         const bulletGrid = document.createElement("div");
         bulletGrid.className = "bullet-grid";
@@ -2380,9 +2544,15 @@
           return box;
         }
 
-        bulletGrid.appendChild(createBulletBox("Points forts", analysis.points_forts, "is-strengths", "check"));
-        bulletGrid.appendChild(createBulletBox("Points à vérifier", analysis.points_a_verifier, "is-checks", "alert"));
-        section.appendChild(bulletGrid);
+        if (analysis.score !== null && (analysis.points_forts.length || analysis.points_a_verifier.length)) {
+          if (analysis.points_forts.length) {
+            bulletGrid.appendChild(createBulletBox("Points forts (IA)", analysis.points_forts, "is-strengths", "check"));
+          }
+          if (analysis.points_a_verifier.length) {
+            bulletGrid.appendChild(createBulletBox("Points à vérifier (IA)", analysis.points_a_verifier, "is-checks", "alert"));
+          }
+          section.appendChild(bulletGrid);
+        }
 
         const evidenceGrid = document.createElement("div");
         evidenceGrid.className = "evidence-grid";
@@ -2508,6 +2678,7 @@
           }
         }
         state.analyses = nextAnalyses;
+        renderProfile(payload.profile);
 
         const prog = payload.progress && typeof payload.progress === "object" ? payload.progress : {};
         state.progress = {

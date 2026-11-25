@@ -1,7 +1,7 @@
 """Shared filters for job search results."""
 import re
 
-SCORE_VERSION = "cv-rules-v1"
+SCORE_VERSION = "cv-rules-v2"
 
 ROLE_PATTERNS = {
     "IA complémentaire": re.compile(r"\b(?:junior\s+)?ai\s+(?:engineer|infrastructure|platform)\b|\b(?:mlops|llmops|genai|generative\s+ai|machine\s+learning\s+ops)\b", re.I),
@@ -40,8 +40,8 @@ def is_senior(job):
         title, re.IGNORECASE))
 
 
-def experience_evidence(text, min_years=0):
-    """Return a literal excerpt only for a job-related experience duration."""
+def experience_mentions(text, min_years=0, required_only=False):
+    """Yield experience minimums with their literal excerpts."""
     numbers = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
                "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10}
     number_pattern = r"\d{1,2}(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten"
@@ -69,21 +69,21 @@ def experience_evidence(text, min_years=0):
             continue
         if re.search(r"\b(?:company|business|consultancy|organisation|organization|firm|agency|provider)\b.{0,40}\b(?:with|has|over|for|more\s+than)\b[^.]*$", before, re.I):
             continue
-        if min_years and re.search(r"(?:up\s+to|less\s+than|fewer\s+than|under|maximum\s+of|at\s+most)\s*$", before, re.I):
+        if required_only and re.search(r"(?:up\s+to|less\s+than|fewer\s+than|under|maximum\s+of|at\s+most)\s*$", before, re.I):
             continue
         before_clause = re.split(r"[;,\n]", before)[-1]
         after_clause = re.split(r"[;,\n]", after)[0]
         nearby = before_clause[-35:] + after_clause[:65]
-        if min_years and re.search(r"\bnot\s+required\b", nearby, re.I):
+        if required_only and re.search(r"\bnot\s+(?:required|mandatory|essential|necessary)\b", nearby, re.I):
             continue
-        optional_cue = r"\b(?:preferred|desirable|nice\s+to\s+have|bonus|advantage(?:ous)?|ideal(?:ly)?|beneficial|plus|highly\s+regarded|or\s+equivalent)\b"
+        optional_cue = r"\b(?:optional|preferred|desirable|nice\s+to\s+have|bonus|advantage(?:ous)?|ideal(?:ly)?|beneficial|plus|highly\s+regarded|or\s+equivalent)\b"
         line_start = text.rfind("\n", 0, match.start()) + 1
         previous_line_end = max(0, line_start - 1)
         previous_line_start = text.rfind("\n", 0, previous_line_end) + 1
         previous_line = text[previous_line_start:previous_line_end].strip()
         optional_heading = bool(re.fullmatch(r"(?:preferred|desirable|optional|bonus|nice\s+to\s+have)\s*:?", previous_line, re.I))
         optional_context = before[-100:] + after[:100]
-        if (min_years and (re.search(optional_cue, optional_context, re.I) or optional_heading)
+        if (required_only and (re.search(optional_cue, optional_context, re.I) or optional_heading)
                 and not re.search(r"\b(?:required|mandatory|must)\b", nearby, re.I)):
             continue
         # Do not treat company age, contracts, or support periods as job experience.
@@ -91,10 +91,13 @@ def experience_evidence(text, min_years=0):
         activity = re.match(r"\s*(?:(?:of\s+)?(?:designing|developing|building|deploying|maintaining|administering|engineering|operating|implementing)\b|(?:in|as)\s+(?:a\s+)?(?:similar|related|cloud|devops|platform|infrastructure|systems?|sre|site\s+reliability|it|technology|software|network)\b)", after, re.I)
         if not experience_words and not activity:
             continue
-        return (before + text[match.start():match.end()] + after).strip()
-    return None
+        yield number, (before + text[match.start():match.end()] + after).strip()
+
+
+def experience_evidence(text):
+    return next((quote for _, quote in experience_mentions(text)), None)
 
 
 def experience_exclusion(text):
     """Return a literal excerpt only for a clear minimum of five years or more."""
-    return experience_evidence(text, min_years=5)
+    return next((quote for _, quote in experience_mentions(text, min_years=5, required_only=True)), None)
