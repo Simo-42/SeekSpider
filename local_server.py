@@ -7,7 +7,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
-from job_filters import is_senior
+from job_filters import experience_exclusion, is_senior
 
 
 def read_jobs(path, include_senior=False):
@@ -64,20 +64,24 @@ def container_running(container):
 
 def state(jobs_path, report, total, container, profile=None):
     all_jobs = read_jobs(jobs_path, include_senior=True)
-    jobs = [job for job in all_jobs if not is_senior(job)]
     analyses = read_analyses(report)
     running = container_running(container)
+    excluded_ids = {job_id for job_id, analysis in analyses.items()
+                    if experience_exclusion(analysis.get("preuve_experience", ""))}
+    failures = 0
+    try:
+        saved = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))
+        failures = len(saved.get("echecs", []))
+        excluded_ids.update(str(row["job"]["job_id"]) for row in saved.get("exclusions", []))
+    except (OSError, ValueError, TypeError, KeyError):
+        pass
+    jobs = [job for job in all_jobs if not is_senior(job) and str(job["job_id"]) not in excluded_ids]
     visible_ids = {str(job["job_id"]) for job in jobs}
     analyses = {job_id: analysis for job_id, analysis in analyses.items() if job_id in visible_ids}
     completed = len(analyses)
-    failures = 0
-    try:
-        failures = len(json.loads(report.with_suffix(".json").read_text(encoding="utf-8")).get("echecs", []))
-    except (OSError, ValueError, TypeError):
-        pass
     if running:
         status, message = "running", "Analyse locale en cours"
-    elif jobs and completed == len(jobs):
+    elif all_jobs and completed == len(jobs) and not failures:
         status, message = "finished", "Analyse terminée ; consulte les résultats"
     else:
         status = "stopped"

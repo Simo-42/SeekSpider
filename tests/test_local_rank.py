@@ -67,6 +67,26 @@ def test_finds_evidence_beyond_model_context():
     assert evidence in text
 
 
+def test_excludes_clear_five_year_minimum_but_not_ranges_or_optional():
+    for text in ("Skills & Experience 5+ years’ experience in DevOps.",
+                 "At least 5 years of hands-on experience.",
+                 "Minimum 5-7 years of relevant experience.",
+                 "5 to 7 years of relevant experience required.",
+                 "Six years of experience in cloud engineering.",
+                 "A minimum of 6.5+ years of experience."):
+        proof = rank.experience_exclusion(text)
+        assert proof and proof in text
+    for text in ("3-5 years of experience.", "3 to 5 years of experience.", "three to five years of experience.", "Up to 5 years of experience.",
+                 "Less than 5 years of experience.", "5+ years of experience preferred.",
+                 "4 years of experience required; 5 years of experience preferred.",
+                 "4.5 years of experience required.",
+                 "A 5-year contract with experienced colleagues.",
+                 "A five-year warranty on the product.",
+                 "An Australian consultancy with over 15 years of experience, we help businesses.",
+                 "Our business has over 30 years of experience."):
+        assert rank.experience_exclusion(text) is None, text
+
+
 def test_search_targets_all_titles_and_australia():
     search_spec = importlib.util.spec_from_file_location("targeted_search", Path(__file__).resolve().parents[1] / "targeted_search.py")
     search = importlib.util.module_from_spec(search_spec)
@@ -92,4 +112,18 @@ def test_resume_preserves_existing_and_skips_it(tmp_path):
     fetch.assert_called_once_with('2')
     data = json.loads(report.with_suffix('.json').read_text(encoding='utf-8'))
     assert [row['offre']['job_id'] for row in data['analyses']] == ['1', '2']
+
+
+def test_exclusion_survives_resume_without_calling_model(tmp_path):
+    jobs, report = tmp_path / 'jobs.jsonl', tmp_path / 'report.md'
+    jobs.write_text(json.dumps({'job_id': '10', 'job_title': 'Cloud Engineer'}), encoding='utf-8')
+    with patch('sys.argv', ['local_rank', str(jobs), str(report), '--resume']), \
+         patch.object(rank.fetcher, 'fetch_job_detail', return_value=('<p>5+ years of cloud experience required.</p>', None, 'success')) as fetch, \
+         patch.object(rank, 'analyze') as analyze, patch.object(rank.time, 'sleep'):
+        rank.main()
+        rank.main()
+    fetch.assert_called_once_with('10')
+    analyze.assert_not_called()
+    data = json.loads(report.with_suffix('.json').read_text(encoding='utf-8'))
+    assert len(data['exclusions']) == 1 and data['exclusions'][0]['job']['job_id'] == '10'
 

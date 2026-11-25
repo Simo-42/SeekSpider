@@ -9,7 +9,7 @@ from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
-from job_filters import is_senior
+from job_filters import experience_exclusion, is_senior
 
 
 spec = importlib.util.spec_from_file_location(
@@ -156,10 +156,10 @@ def atomic_write(path, text):
     os.replace(temporary, path)
 
 
-def save_results(output, results, failures):
+def save_results(output, results, failures, exclusions=None):
     render(results, output)
     atomic_write(output.with_suffix(".json"), json.dumps(
-        {"analyses": results, "echecs": failures}, ensure_ascii=False, indent=2))
+        {"analyses": results, "echecs": failures, "exclusions": exclusions or []}, ensure_ascii=False, indent=2))
 
 
 def main():
@@ -176,21 +176,25 @@ def main():
     profile = PROFILE
     if args.profile:
         profile += "\n\nCV FOURNI :\n" + args.profile.read_text(encoding="utf-8")
-    results, failures = [], []
+    results, failures, exclusions = [], [], []
     saved = args.output.with_suffix(".json")
     if args.resume and saved.exists():
         data = json.loads(saved.read_text(encoding="utf-8"))
         results = data["analyses"]
+        exclusions = data.get("exclusions", [])
         if not isinstance(results, list):
             raise ValueError("Fichier d'analyses invalide")
+        if not isinstance(exclusions, list):
+            raise ValueError("Fichier d'exclusions invalide")
     jobs = select_jobs(args.input, args.limit)
     already_done = {str(row["offre"]["job_id"]) for row in results}
+    already_done.update(str(row["job"]["job_id"]) for row in exclusions)
     jobs = [job for job in jobs if str(job["job_id"]) not in already_done]
     for i, job in enumerate(jobs, 1):
         html, _, status = fetcher.fetch_job_detail(job["job_id"])
         if status != "success":
             failures.append({"job": job, "status": status})
-            save_results(args.output, results, failures)
+            save_results(args.output, results, failures, exclusions)
             print(f"{i}/{len(jobs)} {job['job_id']}: {status}", flush=True)
             if status == "rate_limited":
                 print("Limite SEEK atteinte : arrêt de la collecte.", flush=True)
@@ -198,16 +202,23 @@ def main():
             time.sleep(1)
             continue
         description = BeautifulSoup(html, "html.parser").get_text(" ", strip=True)
+        reason = experience_exclusion(description)
+        if reason:
+            exclusions.append({"job": job, "reason": reason})
+            save_results(args.output, results, failures, exclusions)
+            print(f"{i}/{len(jobs)} {job['job_id']}: exclue (5 ans ou plus)", flush=True)
+            time.sleep(1)
+            continue
         try:
             results.append({"offre": job, "analyse": analyze(job, description, profile, args.model)})
-            save_results(args.output, results, failures)
+            save_results(args.output, results, failures, exclusions)
             print(f"{i}/{len(jobs)} {job['job_id']}: analysée", flush=True)
         except (requests.RequestException, ValueError, KeyError, TypeError) as exc:
             failures.append({"job": job, "status": str(exc)})
-            save_results(args.output, results, failures)
+            save_results(args.output, results, failures, exclusions)
             print(f"{i}/{len(jobs)} {job['job_id']}: analyse impossible ({exc})", flush=True)
         time.sleep(1)
-    save_results(args.output, results, failures)
+    save_results(args.output, results, failures, exclusions)
     print(f"Terminé : {len(results)} analysées, {len(failures)} échecs.", flush=True)
 
 
