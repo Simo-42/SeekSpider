@@ -50,3 +50,19 @@ def test_search_targets_all_titles_and_australia():
     assert all(query["where"] == ["Australia"] for query in queries)
     assert {query["keywords"][0] for query in queries} == set(search.TITLES)
 
+
+def test_resume_preserves_existing_and_skips_it(tmp_path):
+    jobs = tmp_path / "jobs.jsonl"
+    report = tmp_path / "report.md"
+    existing = {"offre": {"job_id": "1", "job_title": "Cloud"}, "analyse": {"score": 70, "resume": "OK", "points_forts": [], "points_a_verifier": [], "experience": "non précisé", "preuve_experience": "non précisé", "visa_sponsoring": "non précisé", "preuve_visa": "non précisé"}}
+    jobs.write_text('\n'.join(json.dumps(job) for job in [existing["offre"], {"job_id": "2", "job_title": "Cloud"}, {"job_id": "3", "job_title": "Senior Cloud"}]), encoding="utf-8")
+    report.with_suffix('.json').write_text(json.dumps({"analyses": [existing], "echecs": []}), encoding="utf-8")
+    with patch('sys.argv', ['local_rank', str(jobs), str(report), '--resume']), \
+         patch.object(rank.fetcher, 'fetch_job_detail', return_value=('<p>Cloud</p>', None, 'success')) as fetch, \
+         patch.object(rank, 'analyze', return_value=existing['analyse']), \
+         patch.object(rank.time, 'sleep'):
+        rank.main()
+    fetch.assert_called_once_with('2')
+    data = json.loads(report.with_suffix('.json').read_text(encoding='utf-8'))
+    assert [row['offre']['job_id'] for row in data['analyses']] == ['1', '2']
+

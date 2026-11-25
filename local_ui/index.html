@@ -292,6 +292,21 @@
       background: var(--bg-surface);
     }
 
+    .btn-stop {
+      background: var(--danger-bg);
+      border-color: var(--danger-border);
+      color: var(--danger-text);
+      font-weight: 600;
+    }
+    .btn-stop:hover:not(:disabled) {
+      background: rgba(239, 68, 68, 0.24);
+      border-color: #f87171;
+      color: #fee2e2;
+    }
+    .btn-stop:active:not(:disabled) {
+      background: rgba(239, 68, 68, 0.3);
+    }
+
     /* Main Container */
     .main-wrap {
       width: 100%;
@@ -364,7 +379,7 @@
     .progress-header {
       display: flex;
       flex-wrap: wrap;
-      align-items: baseline;
+      align-items: center;
       justify-content: space-between;
       gap: 10px 18px;
     }
@@ -375,6 +390,45 @@
       align-items: center;
       gap: 10px;
       min-width: 0;
+      flex: 1 1 280px;
+    }
+
+    .progress-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .progress-alert {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--danger-border);
+      background: var(--danger-bg);
+      color: var(--danger-text);
+      font-size: 0.84375rem;
+      line-height: 1.45;
+    }
+    .progress-alert[hidden] {
+      display: none;
+    }
+    .progress-alert-content {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      min-width: 0;
+      flex: 1;
+      overflow-wrap: anywhere;
+    }
+    .progress-alert-content svg {
+      flex-shrink: 0;
+      margin-top: 2px;
     }
 
     .status-pill {
@@ -416,7 +470,7 @@
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 16px;
+      gap: 8px 18px;
       font-size: 0.84375rem;
       color: var(--text-secondary);
       font-variant-numeric: tabular-nums;
@@ -424,6 +478,20 @@
     .progress-counters strong {
       color: var(--text-primary);
       font-weight: 600;
+    }
+    .counter-excluded {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 9px;
+      border-radius: var(--radius-pill);
+      border: 1px solid var(--neutral-badge-border);
+      background: var(--bg-inset);
+      color: var(--text-secondary);
+      font-size: 0.8125rem;
+    }
+    .counter-excluded strong {
+      color: var(--text-primary);
     }
 
     .progress-track {
@@ -921,6 +989,31 @@
       color: var(--text-muted);
     }
 
+    .score-method-box {
+      padding: 13px 15px;
+      border-radius: var(--radius-md);
+      background: var(--bg-inset);
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .score-method-box h3 {
+      margin: 0;
+      font-size: 0.84375rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .score-method-box p {
+      margin: 0;
+      max-width: 68ch;
+      font-size: 0.84375rem;
+      line-height: 1.5;
+      color: var(--text-secondary);
+    }
+
     .detail-block {
       display: flex;
       flex-direction: column;
@@ -1014,6 +1107,13 @@
       color: var(--text-primary);
       font-weight: 500;
       overflow-wrap: anywhere;
+    }
+
+    .evidence-proof-label {
+      margin: 2px 0 0;
+      font-size: 0.78125rem;
+      font-weight: 600;
+      color: var(--text-muted);
     }
 
     .evidence-quote {
@@ -1115,6 +1215,12 @@
       .detail-card {
         padding: 16px;
       }
+      .progress-actions {
+        width: 100%;
+      }
+      .progress-actions .btn {
+        flex: 1 1 auto;
+      }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -1183,11 +1289,37 @@
             <span class="status-pill" id="progress-status-pill">Initialisation</span>
             <p class="progress-message" id="progress-message" aria-live="polite">En attente des données locales…</p>
           </div>
-          <div class="progress-counters" id="progress-counters">
-            <span>Progression : <strong id="counter-progress">0 / 0</strong></span>
-            <span>Offres uniques : <strong id="counter-jobs">0</strong></span>
-            <span>Analysées : <strong id="counter-analysed">0</strong></span>
+          <div class="progress-actions">
+            <button type="button" class="btn btn-primary" id="start-analysis-btn" disabled>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polygon points="6 4 20 12 6 20 6 4"></polygon>
+              </svg>
+              <span>Démarrer ou reprendre</span>
+            </button>
+            <button type="button" class="btn btn-stop" id="stop-analysis-btn" disabled>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="6" y="6" width="12" height="12" rx="1.5"></rect>
+              </svg>
+              <span>Arrêter</span>
+            </button>
           </div>
+        </div>
+        <div id="analysis-action-error" class="progress-alert" role="alert" hidden>
+          <div class="progress-alert-content">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            <span id="analysis-action-error-text"></span>
+          </div>
+          <button type="button" class="btn btn-quiet" id="dismiss-action-error-btn">Fermer</button>
+        </div>
+        <div class="progress-counters" id="progress-counters">
+          <span>Progression : <strong id="counter-progress">0 / 0</strong></span>
+          <span>Offres uniques : <strong id="counter-jobs">0</strong></span>
+          <span>Analysées : <strong id="counter-analysed">0</strong></span>
+          <span class="counter-excluded" title="Postes Senior automatiquement masqués de la liste et de l'analyse">Exclus (Senior masqués) : <strong id="counter-excluded">0</strong></span>
         </div>
         <div
           class="progress-track"
@@ -1318,12 +1450,24 @@
 
       const POLL_INTERVAL_MS = 5000;
       const API_URL = "/api/state";
+      const API_START_URL = "/api/analysis/start";
+      const API_STOP_URL = "/api/analysis/stop";
+
+      let activeFetchPromise = null;
 
       const state = {
         jobs: [],
         rawJobsCount: 0,
         analyses: Object.create(null),
-        progress: { completed: 0, total: 0, status: "idle", message: "" },
+        progress: {
+          completed: 0,
+          total: 0,
+          excluded: 0,
+          can_start: false,
+          can_stop: false,
+          status: "idle",
+          message: ""
+        },
         search: "",
         region: "all",
         analysedOnly: false,
@@ -1332,6 +1476,8 @@
         mobileDetailOpen: false,
         hasLoadedOnce: false,
         isFetching: false,
+        isActionPending: false,
+        actionError: null,
         lastUpdatedAt: null,
         lastError: null,
         pollTimer: null,
@@ -1347,9 +1493,15 @@
         retryBtn: document.getElementById("retry-btn"),
         progressStatusPill: document.getElementById("progress-status-pill"),
         progressMessage: document.getElementById("progress-message"),
+        startAnalysisBtn: document.getElementById("start-analysis-btn"),
+        stopAnalysisBtn: document.getElementById("stop-analysis-btn"),
+        analysisActionError: document.getElementById("analysis-action-error"),
+        analysisActionErrorText: document.getElementById("analysis-action-error-text"),
+        dismissActionErrorBtn: document.getElementById("dismiss-action-error-btn"),
         counterProgress: document.getElementById("counter-progress"),
         counterJobs: document.getElementById("counter-jobs"),
         counterAnalysed: document.getElementById("counter-analysed"),
+        counterExcluded: document.getElementById("counter-excluded"),
         progressBar: document.getElementById("progress-bar"),
         progressFill: document.getElementById("progress-fill"),
         searchInput: document.getElementById("search-input"),
@@ -1603,6 +1755,12 @@
         if (lower === "error" || lower === "failed" || lower === "erreur" || lower === "rate_limited") {
           return { label: lower === "rate_limited" ? "Limite SEEK atteinte" : "Erreur", tone: "is-error" };
         }
+        if (lower === "stopping" || lower === "arret_en_cours") {
+          return { label: "Arrêt en cours", tone: "" };
+        }
+        if (lower === "stopped" || lower === "arrete" || lower === "arrêté" || lower === "paused") {
+          return { label: "Arrêté", tone: "" };
+        }
         if (lower === "idle" || lower === "pending" || lower === "waiting" || lower === "en_attente") {
           return { label: "En attente", tone: "" };
         }
@@ -1703,6 +1861,9 @@
       function renderProgress() {
         const completed = Math.max(0, Number(state.progress.completed) || 0);
         const total = Math.max(0, Number(state.progress.total) || 0);
+        const excluded = Math.max(0, Number(state.progress.excluded) || 0);
+        const statusLower = asText(state.progress.status, "").toLowerCase();
+        const isRunning = statusLower === "running";
         const statusInfo = mapProgressStatus(state.progress.status, completed, total);
 
         els.progressStatusPill.className = "status-pill" + (statusInfo.tone ? " " + statusInfo.tone : "");
@@ -1719,6 +1880,21 @@
           els.progressMessage.textContent = completed + " offre(s) traitée(s) sur " + total + ".";
         }
 
+        const disableStart = !state.hasLoadedOnce || state.isActionPending || isRunning || state.progress.can_start === false;
+        const disableStop = !state.hasLoadedOnce || state.isActionPending || !isRunning || state.progress.can_stop === false;
+        els.startAnalysisBtn.disabled = disableStart;
+        els.stopAnalysisBtn.disabled = disableStop;
+        els.startAnalysisBtn.setAttribute("aria-busy", state.isActionPending ? "true" : "false");
+        els.stopAnalysisBtn.setAttribute("aria-busy", state.isActionPending ? "true" : "false");
+
+        if (state.actionError) {
+          els.analysisActionErrorText.textContent = state.actionError;
+          els.analysisActionError.hidden = false;
+        } else {
+          els.analysisActionError.hidden = true;
+          els.analysisActionErrorText.textContent = "";
+        }
+
         const pct = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0;
         els.counterProgress.textContent = total > 0 ? (completed + " / " + total + " (" + pct + " %)") : (completed + " / 0");
         els.counterJobs.textContent = String(state.jobs.length);
@@ -1728,6 +1904,7 @@
           if (getAnalysisForJob(state.jobs[i])) analysedCount += 1;
         }
         els.counterAnalysed.textContent = String(analysedCount);
+        els.counterExcluded.textContent = String(excluded);
 
         els.progressBar.setAttribute("aria-valuenow", String(pct));
         els.progressFill.style.width = pct + "%";
@@ -2123,6 +2300,16 @@
         scoreBox.appendChild(scoreNote);
         section.appendChild(scoreBox);
 
+        const methodBox = document.createElement("div");
+        methodBox.className = "score-method-box";
+        const methodH3 = document.createElement("h3");
+        methodH3.textContent = "Méthode du score";
+        const methodP = document.createElement("p");
+        methodP.textContent = "Estimation indicative générée par l'IA en comparant l'annonce à votre CV, sans pondération chiffrée fixe. Les points forts et les points à vérifier expliquent cette estimation.";
+        methodBox.appendChild(methodH3);
+        methodBox.appendChild(methodP);
+        section.appendChild(methodBox);
+
         const resumeBlock = document.createElement("div");
         resumeBlock.className = "detail-block";
         const resumeH3 = document.createElement("h3");
@@ -2185,9 +2372,14 @@
           valP.textContent = value;
           box.appendChild(valP);
 
+          const proofLabel = document.createElement("p");
+          proofLabel.className = "evidence-proof-label";
+          proofLabel.textContent = "Preuve extraite de l'annonce";
+          box.appendChild(proofLabel);
+
           const quoteEl = document.createElement("blockquote");
           quoteEl.className = "evidence-quote";
-          quoteEl.textContent = "Extrait : " + quote;
+          quoteEl.textContent = quote;
           box.appendChild(quoteEl);
 
           if (isVisa) {
@@ -2290,6 +2482,9 @@
         state.progress = {
           completed: Number.isFinite(Number(prog.completed)) ? Number(prog.completed) : 0,
           total: Number.isFinite(Number(prog.total)) ? Number(prog.total) : 0,
+          excluded: Number.isFinite(Number(prog.excluded)) ? Math.max(0, Math.floor(Number(prog.excluded))) : 0,
+          can_start: typeof prog.can_start === "boolean" ? prog.can_start : null,
+          can_stop: typeof prog.can_stop === "boolean" ? prog.can_stop : null,
           status: asText(prog.status, "idle"),
           message: asText(prog.message, "")
         };
@@ -2308,39 +2503,107 @@
         }, POLL_INTERVAL_MS);
       }
 
-      async function fetchState() {
-        if (state.isFetching) return;
+      async function fetchState(options) {
+        const force = Boolean(options && options.force);
+        if (state.isFetching) {
+          if (force && activeFetchPromise) {
+            await activeFetchPromise;
+            return fetchState();
+          }
+          return activeFetchPromise;
+        }
         state.isFetching = true;
         renderSyncHeader();
 
+        const runFetch = (async function () {
+          try {
+            const response = await fetch(API_URL, {
+              method: "GET",
+              headers: { "Accept": "application/json" },
+              cache: "no-store"
+            });
+            if (!response.ok) {
+              throw new Error("Le serveur local a répondu avec le code HTTP " + response.status + ".");
+            }
+            const data = await response.json();
+            applyPayload(data);
+          } catch (err) {
+            const reason = err && err.message ? err.message : "Connexion impossible.";
+            state.lastError = "Impossible de récupérer l'état local (/api/state) : " + reason + " Nouvelle tentative automatique dans 5 s.";
+          } finally {
+            state.isFetching = false;
+            activeFetchPromise = null;
+            renderAll();
+            scheduleNextPoll();
+          }
+        })();
+
+        activeFetchPromise = runFetch;
+        return runFetch;
+      }
+
+      async function triggerAnalysisAction(action) {
+        if (state.isActionPending) return;
+        const endpoint = action === "start" ? API_START_URL : API_STOP_URL;
+        state.isActionPending = true;
+        state.actionError = null;
+        renderProgress();
+
         try {
-          const response = await fetch(API_URL, {
-            method: "GET",
-            headers: { "Accept": "application/json" },
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json"
+            },
+            body: JSON.stringify({}),
             cache: "no-store"
           });
-          if (!response.ok) {
-            throw new Error("Le serveur local a répondu avec le code HTTP " + response.status + ".");
+
+          let payload = null;
+          try {
+            payload = await response.json();
+          } catch (_parseErr) {
+            payload = null;
           }
-          const data = await response.json();
-          applyPayload(data);
+
+          const apiError = payload && typeof payload === "object" ? asText(payload.error, "") : "";
+          if (!response.ok) {
+            throw new Error(apiError || ("Le serveur local a répondu avec le code HTTP " + response.status + "."));
+          }
+          if (apiError) {
+            throw new Error(apiError);
+          }
         } catch (err) {
-          const reason = err && err.message ? err.message : "Connexion impossible.";
-          state.lastError = "Impossible de récupérer l'état local (/api/state) : " + reason + " Nouvelle tentative automatique dans 5 s.";
+          const reason = err && err.message ? err.message : "Action impossible sur le serveur local.";
+          state.actionError = reason;
         } finally {
-          state.isFetching = false;
-          renderAll();
-          scheduleNextPoll();
+          state.isActionPending = false;
+          renderProgress();
+          await fetchState({ force: true });
         }
       }
 
       // Event bindings
       els.refreshBtn.addEventListener("click", function () {
-        fetchState();
+        fetchState({ force: true });
       });
 
       els.retryBtn.addEventListener("click", function () {
-        fetchState();
+        fetchState({ force: true });
+      });
+
+      els.startAnalysisBtn.addEventListener("click", function () {
+        triggerAnalysisAction("start");
+      });
+
+      els.stopAnalysisBtn.addEventListener("click", function () {
+        triggerAnalysisAction("stop");
+      });
+
+      els.dismissActionErrorBtn.addEventListener("click", function () {
+        state.actionError = null;
+        renderProgress();
       });
 
       els.searchInput.addEventListener("input", function (event) {

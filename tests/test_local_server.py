@@ -17,4 +17,5 @@ def test_state_shows_live_analyses_without_duplicates(tmp_path):
     assert state["analyses"]["12"]["score"] == 82
     assert state["analyses"]["12"]["points_forts"] == ["AWS", "Linux"]
     assert state["progress"]["completed"] == 1
-    assert state["progress"]["status"] == "stopped"
+    assert state["progress"]["excluded"] == 1
+    assert state["progress"]["status"] == "finished"

@@ -22,3 +22,12 @@ Pour utiliser un CV texte UTF-8 local, placer le fichier dans le dossier monté 
 
 Pour redémarrer Ollama après un arrêt : `docker start seekspider-ollama`. Pour l'arrêter : `docker stop seekspider-ollama`.
 
+Pour ouvrir l'interface locale et permettre le démarrage et la reprise de l'analyse, exécuter sur l'hôte :
+
+```bash
+python3 local_server.py --jobs /chemin/vers/resultats/offres.jsonl \
+  --report /chemin/vers/resultats/analyse.md --profile /chemin/prive/cv.txt
+```
+
+Ouvrir `http://localhost:8765`. Le serveur écoute uniquement sur la machine ; il ne sert pas le fichier de profil. Les boutons démarrent ou arrêtent le conteneur local et la reprise conserve les analyses enregistrées. Les échecs sont réessayés à la reprise ; une interruption peut nécessiter de reprendre l'offre en cours. Le score est une estimation du modèle à partir du CV et de l'annonce, pas un barème chiffré certifié ; vérifier les extraits et l'annonce avant de postuler. Aucune offre n'est exclue sur la date du projet.
+

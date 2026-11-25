@@ -2,6 +2,7 @@
 import argparse
 import importlib.util
 import json
+import os
 import time
 from pathlib import Path
 
@@ -85,7 +86,19 @@ def render(results, output):
                   "**À vérifier :** " + "; ".join(a["points_a_verifier"]), "",
                   f"**Expérience :** {a['experience']} — extrait : {a['preuve_experience']}", "",
                   f"**Visa / sponsoring :** {a['visa_sponsoring']} — extrait : {a['preuve_visa']}", ""]
-    output.write_text("\n".join(lines), encoding="utf-8")
+    atomic_write(output, "\n".join(lines))
+
+
+def atomic_write(path, text):
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(text, encoding="utf-8")
+    os.replace(temporary, path)
+
+
+def save_results(output, results, failures):
+    render(results, output)
+    atomic_write(output.with_suffix(".json"), json.dumps(
+        {"analyses": results, "echecs": failures}, ensure_ascii=False, indent=2))
 
 
 def main():
@@ -95,6 +108,7 @@ def main():
     parser.add_argument("--profile", type=Path, help="Fichier texte contenant le profil ou le CV")
     parser.add_argument("--limit", type=int, default=20)
     parser.add_argument("--model", default="qwen3:14b")
+    parser.add_argument("--resume", action="store_true", help="Conserver et reprendre les analyses déjà enregistrées")
     args = parser.parse_args()
     if args.limit < 1:
         parser.error("--limit doit être positif")
@@ -102,11 +116,20 @@ def main():
     if args.profile:
         profile += "\n\nCV FOURNI :\n" + args.profile.read_text(encoding="utf-8")
     results, failures = [], []
+    saved = args.output.with_suffix(".json")
+    if args.resume and saved.exists():
+        data = json.loads(saved.read_text(encoding="utf-8"))
+        results = data["analyses"]
+        if not isinstance(results, list):
+            raise ValueError("Fichier d'analyses invalide")
     jobs = select_jobs(args.input, args.limit)
+    already_done = {str(row["offre"]["job_id"]) for row in results}
+    jobs = [job for job in jobs if str(job["job_id"]) not in already_done]
     for i, job in enumerate(jobs, 1):
         html, _, status = fetcher.fetch_job_detail(job["job_id"])
         if status != "success":
             failures.append({"job": job, "status": status})
+            save_results(args.output, results, failures)
             print(f"{i}/{len(jobs)} {job['job_id']}: {status}", flush=True)
             if status == "rate_limited":
                 print("Limite SEEK atteinte : arrêt de la collecte.", flush=True)
@@ -116,13 +139,14 @@ def main():
         description = BeautifulSoup(html, "html.parser").get_text(" ", strip=True)
         try:
             results.append({"offre": job, "analyse": analyze(job, description, profile, args.model)})
-            render(results, args.output)
+            save_results(args.output, results, failures)
             print(f"{i}/{len(jobs)} {job['job_id']}: analysée", flush=True)
         except (requests.RequestException, ValueError, KeyError, TypeError) as exc:
             failures.append({"job": job, "status": str(exc)})
+            save_results(args.output, results, failures)
             print(f"{i}/{len(jobs)} {job['job_id']}: analyse impossible ({exc})", flush=True)
         time.sleep(1)
-    args.output.with_suffix(".json").write_text(json.dumps({"analyses": results, "echecs": failures}, ensure_ascii=False, indent=2), encoding="utf-8")
+    save_results(args.output, results, failures)
     print(f"Terminé : {len(results)} analysées, {len(failures)} échecs.", flush=True)
 
 
