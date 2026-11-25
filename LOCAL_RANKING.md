@@ -8,7 +8,7 @@ Exemple sous WSL avec Docker et GPU NVIDIA :
 docker build -t seekspider-local .
 docker build -f Dockerfile.local-ranking -t seekspider-run .
 docker run -d --gpus all --name seekspider-ollama -p 127.0.0.1:11434:11434 -v seekspider-ollama-models:/root/.ollama ollama/ollama
-docker exec seekspider-ollama ollama pull qwen3:14b
+docker exec seekspider-ollama ollama pull lfm3:1.7b
 docker run --rm --entrypoint python -v "$PWD:/src:ro" -v /chemin/vers/resultats:/results \
   seekspider-run /src/targeted_search.py /results/offres.jsonl
 docker run --rm --network container:seekspider-ollama --entrypoint python \
@@ -30,4 +30,6 @@ python3 local_server.py --jobs /chemin/vers/resultats/offres.jsonl \
 ```
 
 Ouvrir `http://localhost:8765`. Le serveur écoute uniquement sur la machine ; il ne sert pas le fichier de profil. Les boutons démarrent ou arrêtent le conteneur local et la reprise conserve les analyses enregistrées. Les échecs sont réessayés à la reprise ; une interruption peut nécessiter de reprendre l'offre en cours. Le score est une estimation du modèle à partir du CV et de l'annonce, pas un barème chiffré certifié ; vérifier les extraits et l'annonce avant de postuler. Aucune offre n'est exclue sur la date du projet.
+
+Les nouvelles analyses utilisent LFM3 1.7B ; le modèle de chaque analyse est conservé. Les mentions de visa, de droit au travail, de citoyenneté et de sécurité sont repérées directement dans le texte complet de l'annonce, puis affichées sous forme d'extrait littéral. Une mention repérée ne prouve pas l'éligibilité et une recherche automatique peut manquer une formulation : lire l'annonce d'origine. Les éventuels propos de l'IA sur le visa sont écartés des champs prévus à cet effet.
 

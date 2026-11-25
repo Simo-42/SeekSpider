@@ -1629,6 +1629,7 @@
         const hasScore = Number.isFinite(rawScore) && rawScore >= 0 && rawScore <= 100;
         return {
           score: hasScore ? Math.round(rawScore) : null,
+          modele: asText(raw.modele, "Modèle non renseigné"),
           resume: asText(raw.resume, "Non précisé"),
           points_forts: asStringList(raw.points_forts),
           points_a_verifier: asStringList(raw.points_a_verifier),
@@ -2294,7 +2295,7 @@
 
         const scoreNote = document.createElement("p");
         scoreNote.className = "score-indicative-note";
-        scoreNote.textContent = "Score indicatif généré localement — vérifiez toujours l'annonce complète.";
+        scoreNote.textContent = "Score indicatif local · " + analysis.modele + " — vérifiez toujours l'annonce complète.";
 
         scoreBox.appendChild(scoreLeft);
         scoreBox.appendChild(scoreNote);

@@ -35,9 +35,36 @@ def test_rejects_invented_evidence():
 
     with patch.object(rank.requests, "post", return_value=Response()):
         result = rank.analyze({}, "Requires 3 years experience.", "profile", "model")
-    assert result["preuve_experience"] == "3 years experience"
-    assert result["preuve_visa"] == "non précisé"
-    assert result["visa_sponsoring"] == "non précisé ou preuve non vérifiée"
+    assert result["preuve_experience"] == "Requires 3 years experience."
+    assert result["preuve_visa"] == "Aucun extrait repéré"
+    assert result["visa_sponsoring"] == "Aucune mention repérée automatiquement : vérifie l'annonce."
+
+
+def test_extracts_citizenship_and_never_invents_sponsorship():
+    text = "Join our team. Australian citizenship is mandatory for this position, and you must maintain a security clearance. Apply today."
+    result = rank.attach_source_evidence({"resume": "Visa 482 garanti", "points_forts": [], "points_a_verifier": ["Sponsoring possible", "AWS"]}, text)
+    assert result["preuve_visa"] in text
+    assert "citizenship is mandatory" in result["preuve_visa"]
+    assert "garanti" not in result["resume"]
+    assert result["points_a_verifier"] == ["AWS"]
+
+
+def test_extracts_negative_and_positive_visa_mentions():
+    for text in ("Applicants must have full working rights in Australia. No visa sponsorship is available.",
+                 "Visa sponsorship is available for eligible applicants.",
+                 "Candidates must be eligible to work in Australia.",
+                 "Only Australian citizens are eligible."):
+        evidence = rank.extract_evidence(text, rank.VISA_TERMS)
+        assert evidence and evidence in text
+    assert rank.extract_evidence("Experience with security incident response.", rank.VISA_TERMS) is None
+    assert rank.extract_evidence("Accepts Visa and Mastercard. We value corporate citizenship.", rank.VISA_TERMS) is None
+
+
+def test_finds_evidence_beyond_model_context():
+    text = 'A' * 20000 + '. Australian citizenship is mandatory.'
+    evidence = rank.extract_evidence(text, rank.VISA_TERMS)
+    assert evidence == 'Australian citizenship is mandatory.'
+    assert evidence in text
 
 
 def test_search_targets_all_titles_and_australia():
