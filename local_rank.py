@@ -10,7 +10,7 @@ from pathlib import Path
 import requests
 from bs4 import BeautifulSoup, NavigableString
 from cv_profile import calculate_fit_score, profile_fingerprint, profile_summary
-from job_filters import (SCORE_VERSION, experience_evidence, experience_exclusion,
+from job_filters import (DEFAULT_MODEL, SCORE_VERSION, experience_evidence, experience_exclusion,
                          is_senior, is_target_role, role_category, role_tier)
 
 
@@ -214,9 +214,6 @@ def save_results(output, results, failures, exclusions=None):
     render(results, output)
     atomic_write(output.with_suffix(".json"), json.dumps(
         {"analyses": results, "echecs": failures, "exclusions": exclusions or []}, ensure_ascii=False, indent=2))
-
-
-DEFAULT_MODEL = "qwen3:14b"
 
 
 def main():

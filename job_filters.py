@@ -2,6 +2,7 @@
 import re
 
 SCORE_VERSION = "cv-rules-v4"
+DEFAULT_MODEL = "qwen3:14b"
 
 ROLE_PATTERNS = {
     "IA complémentaire": re.compile(r"\b(?:junior\s+)?ai\s+(?:engineer|infrastructure|platform)\b|\b(?:mlops|llmops|genai|generative\s+ai|machine\s+learning\s+ops)\b", re.I),

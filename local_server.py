@@ -11,7 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 from cv_profile import profile_fingerprint, profile_summary
-from job_filters import (SCORE_VERSION, experience_evidence, experience_exclusion,
+from job_filters import (DEFAULT_MODEL, SCORE_VERSION, experience_evidence, experience_exclusion,
                          is_senior, is_target_role, role_category, whv_flags)
 
 TRIAGE_STATUSES = ("todo", "shortlist", "applied", "dismissed")
@@ -228,6 +228,7 @@ def state(jobs_path, report, total, container, profile=None, search_container=""
     return {"jobs": jobs, "analyses": analyses, "triage": triage, "profile": profile_summary(profile_text),
             "search": search_state(jobs_path, searching, running),
             "progress": {"completed": completed, "total": len(jobs), "status": status, "message": message,
+                         "model": DEFAULT_MODEL,
                          "excluded": len(all_jobs) - len(jobs),
                          "stale": stale,
                          "pending": pending,
@@ -267,7 +268,7 @@ def main():
             "-v", f"{args.report.resolve().parent}:/results",
             "-v", f"{args.profile.resolve()}:/private/profile.txt:ro", *extra_mount, "seekspider-run",
             "/src/local_rank.py", "/data/jobs.jsonl", f"/results/{args.report.name}",
-            "--profile", "/private/profile.txt", "--limit", "1000000", "--resume", *subset]
+            "--profile", "/private/profile.txt", "--model", DEFAULT_MODEL, "--limit", "1000000", "--resume", *subset]
         result = subprocess.run(command, capture_output=True, text=True, timeout=30)
         if result.returncode:
             raise ValueError("Impossible de lancer l'analyse. Vérifie Docker et la présence de l'image seekspider-run.")

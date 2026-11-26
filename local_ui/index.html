@@ -1765,6 +1765,7 @@
           <span>Progression : <strong id="counter-progress">0 / 0</strong></span>
           <span>Offres uniques : <strong id="counter-jobs">0</strong></span>
           <span>Scores calculés : <strong id="counter-analysed">0</strong></span>
+          <span class="counter-excluded" title="Modèle Ollama local utilisé par défaut pour les nouvelles analyses">Modèle IA : <strong id="counter-model">qwen3:14b</strong></span>
           <span class="counter-excluded" title="Postes senior, hors cible, ou exigeant clairement 5 ans ou plus après lecture de la description">Écartées (Senior, 5 ans+ ou hors cible) : <strong id="counter-excluded">0</strong></span>
         </div>
         <div
@@ -2089,6 +2090,7 @@
         counterProgress: document.getElementById("counter-progress"),
         counterJobs: document.getElementById("counter-jobs"),
         counterAnalysed: document.getElementById("counter-analysed"),
+        counterModel: document.getElementById("counter-model"),
         counterExcluded: document.getElementById("counter-excluded"),
         progressBar: document.getElementById("progress-bar"),
         progressFill: document.getElementById("progress-fill"),
@@ -2777,6 +2779,9 @@
           if (analysis && analysis.score !== null) analysedCount += 1;
         }
         els.counterAnalysed.textContent = String(analysedCount + (stale ? " · " + stale + " à recalculer" : ""));
+        if (els.counterModel) {
+          els.counterModel.textContent = asText(state.progress.model, "qwen3:14b");
+        }
         els.counterExcluded.textContent = String(excluded);
 
         els.progressBar.setAttribute("aria-valuenow", String(pct));
@@ -3640,6 +3645,10 @@
             bulletGrid.appendChild(createBulletBox("Points à vérifier (IA)", analysis.points_a_verifier, "is-checks", "alert"));
           }
           section.appendChild(bulletGrid);
+          const modelNote = document.createElement("p");
+          modelNote.className = "score-indicative-note";
+          modelNote.textContent = "Notes IA générées par : " + analysis.modele;
+          section.appendChild(modelNote);
         }
 
         const evidenceGrid = document.createElement("div");
@@ -3811,6 +3820,7 @@
           total: Number.isFinite(Number(prog.total)) ? Number(prog.total) : 0,
           excluded: Number.isFinite(Number(prog.excluded)) ? Math.max(0, Math.floor(Number(prog.excluded))) : 0,
           stale: Number.isFinite(Number(prog.stale)) ? Math.max(0, Math.floor(Number(prog.stale))) : 0,
+          model: asText(prog.model, "qwen3:14b"),
           can_start: typeof prog.can_start === "boolean" ? prog.can_start : null,
           can_stop: typeof prog.can_stop === "boolean" ? prog.can_stop : null,
           status: asText(prog.status, "idle"),
