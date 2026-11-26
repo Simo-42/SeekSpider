@@ -439,6 +439,13 @@
       font-size: 0.9375rem;
     }
 
+    .search-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
     .search-status {
       margin: 0;
       color: var(--text-secondary);
@@ -1686,16 +1693,25 @@
 
       <section class="search-panel" id="search-panel" aria-labelledby="search-task-heading">
         <div>
-          <h2 id="search-task-heading">Collecte SEEK</h2>
+          <h2 id="search-task-heading">Collecte SEEK &amp; Indeed AU</h2>
           <p class="search-status" id="search-task-status" role="status">Connexion au serveur local…</p>
         </div>
-        <button type="button" class="btn" id="start-search-btn" aria-describedby="search-task-status" disabled>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" aria-hidden="true">
-            <circle cx="11" cy="11" r="7"></circle>
-            <path d="m20 20-3.5-3.5"></path>
-          </svg>
-          <span>Chercher de nouvelles offres</span>
-        </button>
+        <div class="search-actions">
+          <button type="button" class="btn" id="start-search-btn" aria-describedby="search-task-status" disabled>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7"></circle>
+              <path d="m20 20-3.5-3.5"></path>
+            </svg>
+            <span>Chercher sur SEEK</span>
+          </button>
+          <button type="button" class="btn" id="start-indeed-btn" aria-describedby="search-task-status" disabled>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7"></circle>
+              <path d="m20 20-3.5-3.5"></path>
+            </svg>
+            <span>Chercher sur Indeed AU</span>
+          </button>
+        </div>
         <div class="search-meter" id="search-meter" hidden>
           <div class="search-meter-label" aria-hidden="true">
             <span id="search-meter-count"></span>
@@ -1960,6 +1976,24 @@
           </div>
 
           <div class="control-group">
+            <span class="control-label" id="source-label">Source</span>
+            <div class="segmented-group" role="group" aria-labelledby="source-label">
+              <button type="button" class="seg-btn" data-source="all" aria-pressed="true">
+                <span>Toutes</span>
+                <span class="seg-count" id="count-source-all">0</span>
+              </button>
+              <button type="button" class="seg-btn" data-source="seek" aria-pressed="false">
+                <span>SEEK</span>
+                <span class="seg-count" id="count-source-seek">0</span>
+              </button>
+              <button type="button" class="seg-btn" data-source="indeed" aria-pressed="false">
+                <span>Indeed</span>
+                <span class="seg-count" id="count-source-indeed">0</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="control-group">
             <span class="control-label">Analyse</span>
             <button type="button" class="toggle-btn" id="analysed-only-btn" aria-pressed="false">
               <span class="toggle-check" aria-hidden="true">
@@ -2019,6 +2053,7 @@
       const POLL_INTERVAL_MS = 5000;
       const API_URL = "/api/state";
       const API_SEARCH_URL = "/api/search/start";
+      const API_INDEED_SEARCH_URL = "/api/search/indeed/start";
       const API_START_URL = "/api/analysis/start";
       const API_STOP_URL = "/api/analysis/stop";
       const API_TRIAGE_URL = "/api/triage";
@@ -2075,6 +2110,7 @@
         triageFilter: "all",
         contract: "all",
         freshness: "all",
+        sourceFilter: "all",
         pvtTargetsOnly: false,
         hideWhvBlocks: false,
         analysedOnly: false,
@@ -2100,6 +2136,7 @@
         errorBannerText: document.getElementById("error-banner-text"),
         retryBtn: document.getElementById("retry-btn"),
         startSearchBtn: document.getElementById("start-search-btn"),
+        startIndeedBtn: document.getElementById("start-indeed-btn"),
         searchTaskStatus: document.getElementById("search-task-status"),
         searchPanel: document.getElementById("search-panel"),
         searchMeter: document.getElementById("search-meter"),
@@ -2157,6 +2194,10 @@
         countFresh7: document.getElementById("count-fresh-7"),
         pvtTargetsBtn: document.getElementById("pvt-targets-btn"),
         countPvtTargets: document.getElementById("count-pvt-targets"),
+        sourceBtns: Array.from(document.querySelectorAll("[data-source]")),
+        countSourceAll: document.getElementById("count-source-all"),
+        countSourceSeek: document.getElementById("count-source-seek"),
+        countSourceIndeed: document.getElementById("count-source-indeed"),
         hideWhvBlocksBtn: document.getElementById("hide-whv-blocks-btn"),
         countWhvBlocks: document.getElementById("count-whv-blocks"),
         analysedOnlyBtn: document.getElementById("analysed-only-btn"),
@@ -2246,7 +2287,12 @@
           if (parsed.protocol !== "https:") return null;
           if (parsed.username || parsed.password) return null;
           const host = parsed.hostname.toLowerCase();
-          if (host === "seek.com.au" || host.endsWith(".seek.com.au")) {
+          if (
+            host === "seek.com.au" ||
+            host.endsWith(".seek.com.au") ||
+            host === "indeed.com" ||
+            host.endsWith(".indeed.com")
+          ) {
             return parsed.href;
           }
           return null;
@@ -2434,6 +2480,7 @@
             business_name: asText(item.business_name, "Entreprise non précisée"),
             role_category: asText(item.role_category, "Famille non classée"),
             employer_tag: asText(item.employer_tag, ""),
+            source: asText(item.source, id.startsWith("in-") ? "indeed" : "seek"),
             area: asText(item.area, "Localisation non précisée"),
             work_type: asText(item.work_type, ""),
             pay_range: asText(item.pay_range, ""),
@@ -2540,6 +2587,7 @@
           if (state.triageFilter !== "all" && triage.status !== state.triageFilter) continue;
           if (!matchesContract(job, state.contract)) continue;
           if (!matchesFreshness(job, state.freshness)) continue;
+          if (state.sourceFilter !== "all" && job.source !== state.sourceFilter) continue;
           if (state.pvtTargetsOnly && !isPvtTarget(job)) continue;
           if (state.hideWhvBlocks && hasWhvBlock(analysis)) continue;
           if (state.analysedOnly && !(analysis && analysis.score !== null)) continue;
@@ -2747,16 +2795,23 @@
       function renderSearchTask() {
         const task = state.searchTask;
         const running = task && task.status === "running";
-        const pending = state.pendingAction === API_SEARCH_URL;
+        const pending = state.pendingAction === API_SEARCH_URL || state.pendingAction === API_INDEED_SEARCH_URL;
         const analysing = state.progress.status === "running";
-        els.startSearchBtn.disabled = !task || !task.can_start || running || analysing || Boolean(state.pendingAction);
-        els.startSearchBtn.setAttribute("aria-busy", String(Boolean(running || pending)));
+        const disableSearch = !task || !task.can_start || running || analysing || Boolean(state.pendingAction);
+        els.startSearchBtn.disabled = disableSearch;
+        els.startSearchBtn.setAttribute("aria-busy", String(Boolean(running || state.pendingAction === API_SEARCH_URL)));
+        if (els.startIndeedBtn) {
+          els.startIndeedBtn.disabled = disableSearch;
+          els.startIndeedBtn.setAttribute("aria-busy", String(Boolean(running || state.pendingAction === API_INDEED_SEARCH_URL)));
+        }
 
         let message = state.hasLoadedOnce ? "Recherche indisponible sur ce serveur." : "Connexion au serveur local…";
         if (state.searchTaskError) {
           message = state.searchTaskError;
         } else if (pending && !running) {
-          message = "Lancement de la recherche sur SEEK…";
+          message = state.pendingAction === API_INDEED_SEARCH_URL
+            ? "Lancement de la recherche sur Indeed AU…"
+            : "Lancement de la recherche sur SEEK…";
         } else if (task) {
           const defaults = {
             idle: analysing ? "Attendez la fin de l’analyse en cours." : "Lancez une recherche sur SEEK.",
@@ -2863,6 +2918,8 @@
         let fresh3 = 0;
         let fresh7 = 0;
         let pvtTargets = 0;
+        let sourceSeek = 0;
+        let sourceIndeed = 0;
         const triageCounts = { todo: 0, shortlist: 0, applied: 0, dismissed: 0 };
         const familyCounts = Object.create(null);
         for (let f = 0; f < ROLE_FAMILIES.length; f += 1) {
@@ -2882,6 +2939,8 @@
           if (matchesFreshness(job, "3")) fresh3 += 1;
           if (matchesFreshness(job, "7")) fresh7 += 1;
           if (isPvtTarget(job)) pvtTargets += 1;
+          if (job.source === "indeed") sourceIndeed += 1;
+          else sourceSeek += 1;
           if (Object.prototype.hasOwnProperty.call(triageCounts, triage.status)) {
             triageCounts[triage.status] += 1;
           }
@@ -2905,6 +2964,9 @@
         els.countFresh3.textContent = String(fresh3);
         els.countFresh7.textContent = String(fresh7);
         els.countPvtTargets.textContent = String(pvtTargets);
+        els.countSourceAll.textContent = String(state.jobs.length);
+        els.countSourceSeek.textContent = String(sourceSeek);
+        els.countSourceIndeed.textContent = String(sourceIndeed);
         els.countWhvBlocks.textContent = String(whvBlocks);
         els.countAnalysedFilter.textContent = String(analysed);
 
@@ -2926,6 +2988,7 @@
           state.triageFilter !== "all" ||
           state.contract !== "all" ||
           state.freshness !== "all" ||
+          state.sourceFilter !== "all" ||
           state.pvtTargetsOnly ||
           state.hideWhvBlocks ||
           state.analysedOnly;
@@ -3086,9 +3149,16 @@
             badgesRow.appendChild(contractPill);
           }
 
+          if (job.source === "indeed") {
+            const srcPill = document.createElement("span");
+            srcPill.className = "job-badge badge-family";
+            srcPill.textContent = "Indeed AU";
+            badgesRow.appendChild(srcPill);
+          }
+
           if (job.employer_tag === "agency" || job.employer_tag === "aws_msp") {
             const empPill = document.createElement("span");
-            empPill.className = "job-badge badge-triage-applied";
+            empPill.className = "job-badge badge-applied";
             empPill.textContent = job.employer_tag === "agency" ? "Agence IT" : "AWS / MSP";
             empPill.title = job.employer_tag === "agency"
               ? "Agence de recrutement IT (contrats courts / placements rapides en PVT 417)"
@@ -3108,9 +3178,9 @@
           const ageDays = jobAgeDays(job);
           if (ageDays !== null && ageDays > 21) {
             const oldPill = document.createElement("span");
-            oldPill.className = "job-badge badge-triage-dismissed";
+            oldPill.className = "job-badge badge-dismissed";
             oldPill.textContent = "> 21 j";
-            oldPill.title = "Annonce publiée il y a plus de 21 jours : vérifier qu'elle est encore ouverte sur SEEK";
+            oldPill.title = "Annonce publiée il y a plus de 21 jours : vérifier qu'elle est encore ouverte";
             badgesRow.appendChild(oldPill);
           }
 
@@ -3508,14 +3578,16 @@
           link.target = "_blank";
           link.rel = "noopener noreferrer";
           const linkText = document.createElement("span");
-          linkText.textContent = "Ouvrir l'annonce originale sur SEEK";
+          linkText.textContent = job.source === "indeed"
+            ? "Ouvrir l'annonce sur Indeed AU"
+            : "Ouvrir l'annonce originale sur SEEK";
           link.appendChild(linkText);
           link.appendChild(createSvgIcon("external"));
           actions.appendChild(link);
         } else {
           const unavailable = document.createElement("span");
           unavailable.className = "link-unavailable";
-          unavailable.textContent = "Lien HTTPS SEEK indisponible ou non vérifié";
+          unavailable.textContent = "Lien HTTPS SEEK / Indeed indisponible ou non vérifié";
           actions.appendChild(unavailable);
         }
 
@@ -3852,6 +3924,7 @@
         state.triageFilter = "all";
         state.contract = "all";
         state.freshness = "all";
+        state.sourceFilter = "all";
         state.pvtTargetsOnly = false;
         state.hideWhvBlocks = false;
         state.analysedOnly = false;
@@ -3871,6 +3944,9 @@
         }
         for (let i = 0; i < els.freshnessBtns.length; i += 1) {
           els.freshnessBtns[i].setAttribute("aria-pressed", els.freshnessBtns[i].dataset.freshness === "all" ? "true" : "false");
+        }
+        for (let i = 0; i < els.sourceBtns.length; i += 1) {
+          els.sourceBtns[i].setAttribute("aria-pressed", els.sourceBtns[i].dataset.source === "all" ? "true" : "false");
         }
         renderAll();
         els.searchInput.focus();
@@ -4016,7 +4092,7 @@
 
       async function triggerAction(endpoint) {
         if (state.pendingAction) return;
-        const errorField = endpoint === API_SEARCH_URL ? "searchTaskError" : "actionError";
+        const errorField = (endpoint === API_SEARCH_URL || endpoint === API_INDEED_SEARCH_URL) ? "searchTaskError" : "actionError";
         state.pendingAction = endpoint;
         state[errorField] = null;
         renderSearchTask();
@@ -4073,6 +4149,12 @@
       els.startSearchBtn.addEventListener("click", function () {
         triggerAction(API_SEARCH_URL);
       });
+
+      if (els.startIndeedBtn) {
+        els.startIndeedBtn.addEventListener("click", function () {
+          triggerAction(API_INDEED_SEARCH_URL);
+        });
+      }
 
       els.startAnalysisBtn.addEventListener("click", function () {
         triggerAction(API_START_URL);
@@ -4158,6 +4240,21 @@
             els.freshnessBtns[j].setAttribute(
               "aria-pressed",
               els.freshnessBtns[j].dataset.freshness === nextFreshness ? "true" : "false"
+            );
+          }
+          renderAll();
+        });
+      }
+
+      for (let i = 0; i < els.sourceBtns.length; i += 1) {
+        els.sourceBtns[i].addEventListener("click", function (event) {
+          const btn = event.currentTarget;
+          const nextSource = btn.dataset.source || "all";
+          state.sourceFilter = nextSource;
+          for (let j = 0; j < els.sourceBtns.length; j += 1) {
+            els.sourceBtns[j].setAttribute(
+              "aria-pressed",
+              els.sourceBtns[j].dataset.source === nextSource ? "true" : "false"
             );
           }
           renderAll();

@@ -141,12 +141,13 @@ def search_state(jobs_path, running, analysing):
         status = "running"
     elif status == "running":
         status = "failed"
+    source_label = "Indeed AU" if saved.get("source") == "indeed" else "SEEK"
     if status == "running":
-        message = "Recherche SEEK en cours."
+        message = f"Recherche {source_label} en cours."
     elif status == "finished":
-        message = f"Recherche terminée. Nouvelles annonces SEEK collectées : {new_jobs}."
+        message = f"Recherche {source_label} terminée. Nouvelles annonces collectées : {new_jobs}."
     elif status == "failed":
-        message = "Recherche interrompue ou incomplète. Les offres enregistrées restent disponibles."
+        message = f"Recherche {source_label} interrompue ou incomplète. Les offres enregistrées restent disponibles."
     else:
         status, message = "idle", ""
     elapsed_seconds = remaining_seconds = None
@@ -210,6 +211,8 @@ def state(jobs_path, report, total, container, profile=None, search_container=""
     for job in jobs:
         job["role_category"] = role_category(job)
         job["employer_tag"] = employer_tag(job)
+        job["source"] = "indeed" if job.get("source") == "indeed" or str(job["job_id"]).startswith("in-") else "seek"
+        job.pop("description", None)
     visible_ids = {str(job["job_id"]) for job in jobs}
     analyses = {job_id: analysis for job_id, analysis in analyses.items() if job_id in visible_ids}
     current_ids = {job_id for job_id, analysis in analyses.items() if not analysis["score_obsolete"]}
@@ -342,13 +345,14 @@ def main():
                 route = urlparse(self.path).path
                 payload, code = {"ok": True}, 200
                 with lock:
-                    if route == "/api/search/start":
+                    if route in ("/api/search/start", "/api/search/indeed/start"):
                         if handoff["pending"] or container_running(container) or container_running(search_container):
                             raise ValueError("Une recherche ou une analyse est déjà en cours.")
                         jobs_path.parent.mkdir(parents=True, exist_ok=True)
+                        script = "/src/indeed_search.py" if route == "/api/search/indeed/start" else "/src/targeted_search.py"
                         command = ["docker", "run", "-d", "--rm", "--name", search_container,
                             "--entrypoint", "python", "-v", f"{project}:/src:ro", "-v", f"{jobs_path.parent}:/jobs",
-                            "seekspider-run", "/src/targeted_search.py", f"/jobs/{jobs_path.name}", "--merge"]
+                            "seekspider-run", script, f"/jobs/{jobs_path.name}", "--merge"]
                         result = subprocess.run(command, capture_output=True, text=True, timeout=30)
                         if result.returncode:
                             raise ValueError("Impossible de lancer la recherche. Vérifie Docker et l’image seekspider-run.")

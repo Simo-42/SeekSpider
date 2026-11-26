@@ -278,14 +278,18 @@ def main():
         jobs = (stale + new)[:args.limit]
     for i, job in enumerate(jobs, 1):
         job_id = str(job["job_id"])
-        description = existing.get(job_id, {}).get("description")
+        stored_job = {k: v for k, v in job.items() if k != "description"}
+        description = existing.get(job_id, {}).get("description") or job.get("description")
         fetched = not description
         if fetched:
-            html, _, status = fetcher.fetch_job_detail(job["job_id"])
+            if stored_job.get("source") == "indeed" or job_id.startswith("in-"):
+                html, status = None, "no_description"
+            else:
+                html, _, status = fetcher.fetch_job_detail(job["job_id"])
         else:
             status = "success"
         if status != "success":
-            failures.append({"job": job, "status": status})
+            failures.append({"job": stored_job, "status": status})
             save_results(args.output, results, failures, exclusions)
             print(f"{i}/{len(jobs)} {job['job_id']}: {status}", flush=True)
             if status == "rate_limited":
@@ -299,7 +303,7 @@ def main():
         if reason:
             results = [row for row in results if str(row["offre"]["job_id"]) != str(job["job_id"])]
             exclusions = [row for row in exclusions if str(row["job"]["job_id"]) != str(job["job_id"])]
-            exclusions.append({"job": job, "reason": reason})
+            exclusions.append({"job": stored_job, "reason": reason})
             save_results(args.output, results, failures, exclusions)
             print(f"{i}/{len(jobs)} {job['job_id']}: exclue (5 ans ou plus)", flush=True)
             if fetched:
@@ -310,20 +314,20 @@ def main():
                         and (args.refresh_ai
                              or existing[job_id]["analyse"].get("modele") == AI_UNAVAILABLE_MODEL))
             if job_id in existing:
-                updated = (analyze(job, description, profile, args.model) if retry_ai
-                           else refresh_existing_analysis(existing[job_id]["analyse"], job, description, profile))
+                updated = (analyze(stored_job, description, profile, args.model) if retry_ai
+                           else refresh_existing_analysis(existing[job_id]["analyse"], stored_job, description, profile))
                 for row in results:
                     if str(row["offre"]["job_id"]) == job_id:
-                        row.update(offre=job, analyse=updated, description=description)
+                        row.update(offre=stored_job, analyse=updated, description=description)
                         break
             else:
-                results.append({"offre": job, "analyse": analyze(job, description, profile, args.model),
+                results.append({"offre": stored_job, "analyse": analyze(stored_job, description, profile, args.model),
                                 "description": description})
             save_results(args.output, results, failures, exclusions)
             label = "notes IA ajoutées" if retry_ai else ("score recalculé" if job_id in existing else "analysée")
             print(f"{i}/{len(jobs)} {job['job_id']}: {label}", flush=True)
         except (requests.RequestException, ValueError, KeyError, TypeError) as exc:
-            failures.append({"job": job, "status": str(exc)})
+            failures.append({"job": stored_job, "status": str(exc)})
             save_results(args.output, results, failures, exclusions)
             print(f"{i}/{len(jobs)} {job['job_id']}: analyse impossible ({exc})", flush=True)
         if fetched:

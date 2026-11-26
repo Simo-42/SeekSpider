@@ -474,3 +474,51 @@ def test_off_target_domains_are_excluded_and_employers_are_tagged():
     assert job_filters.employer_tag({"business_name": "Bureau Of Meteorology"}) == "public_sector"
     assert job_filters.employer_tag({"business_name": "NSW Department of Customer Service"}) == "public_sector"
     assert job_filters.employer_tag({"business_name": "Myconnect"}) == ""
+
+
+def test_indeed_search_normalizes_and_deduplicates_against_seek(tmp_path):
+    ind_spec = importlib.util.spec_from_file_location("indeed_search", Path(__file__).resolve().parents[1] / "indeed_search.py")
+    ind = importlib.util.module_from_spec(ind_spec)
+    ind_spec.loader.exec_module(ind)
+
+    row = ind.normalize_row({
+        "id": "abc123", "title": "Cloud Engineer", "company": "Teradata",
+        "location": "Sydney, NSW, Australia", "job_type": "contract",
+        "currency": "AUD", "min_amount": 900, "max_amount": 1000, "interval": "daily",
+        "date_posted": "2026-11-25", "job_url": "https://au.indeed.com/viewjob?jk=abc123",
+        "description": "AWS Terraform Linux 2 years experience",
+    }, "Cloud Engineer")
+    assert row["job_id"] == "in-abc123" and row["source"] == "indeed"
+    assert row["work_type"] == "Contract/Temp"
+    assert "AUD 900 - 1,000" in row["pay_range"]
+
+    output, staged = tmp_path / "jobs.jsonl", tmp_path / "staged.jsonl"
+    output.write_text(json.dumps({"job_id": "96069657", "job_title": "Cloud Operations Engineer", "business_name": "Are Media"}) + "\n", encoding="utf-8")
+    dup = ind.normalize_row({
+        "id": "in-dup", "title": "Cloud Operations Engineer", "company": "ARE MEDIA",
+        "location": "Sydney", "job_url": "https://au.indeed.com/viewjob?jk=dup", "description": "AWS",
+    }, "Cloud Operations Engineer")
+    staged.write_text("\n".join(map(json.dumps, [dup, row])) + "\n", encoding="utf-8")
+    added = ind.publish_feed(staged, output, merge=True)
+    assert added == ["in-abc123"]
+
+
+def test_local_rank_uses_inline_description_for_indeed_without_seek_fetch(tmp_path):
+    jobs, report = tmp_path / "jobs.jsonl", tmp_path / "report.md"
+    job = {
+        "job_id": "in-999", "source": "indeed", "job_title": "Cloud Engineer",
+        "business_name": "Teradata", "area": "Sydney NSW", "region": "Australia",
+        "url": "https://au.indeed.com/viewjob?jk=999",
+        "description": "2 years experience with AWS, Terraform and Linux.",
+    }
+    jobs.write_text(json.dumps(job), encoding="utf-8")
+    expected = rank.refresh_existing_analysis({"modele": rank.DEFAULT_MODEL, "points_forts": ["AWS"], "points_a_verifier": []}, job, job["description"], "")
+    with patch("sys.argv", ["local_rank", str(jobs), str(report), "--resume"]), \
+         patch.object(rank.fetcher, "fetch_job_detail") as fetch, \
+         patch.object(rank, "analyze", return_value=expected) as model:
+        rank.main()
+    fetch.assert_not_called()
+    model.assert_called_once()
+    data = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))
+    assert "description" not in data["analyses"][0]["offre"]
+    assert "AWS" in data["analyses"][0]["description"]

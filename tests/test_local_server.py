@@ -235,3 +235,16 @@ def test_state_tags_employers_and_excludes_non_it_domains(tmp_path):
     payload = server.state(jobs, report, 4, "")
     tags = {j["job_id"]: j["employer_tag"] for j in payload["jobs"]}
     assert tags == {"1": "agency", "2": "aws_msp", "3": "public_sector"}
+
+
+def test_state_marks_source_and_strips_inline_description(tmp_path):
+    jobs, report = tmp_path / "jobs.jsonl", tmp_path / "report.md"
+    jobs.write_text("\n".join(map(json.dumps, [
+        {"job_id": "100", "job_title": "Cloud Engineer", "business_name": "Talenza"},
+        {"job_id": "in-abc", "source": "indeed", "job_title": "Cloud Engineer", "business_name": "Teradata", "description": "Long text"},
+    ])), encoding="utf-8")
+    payload = server.state(jobs, report, 2, "")
+    by_id = {j["job_id"]: j for j in payload["jobs"]}
+    assert by_id["100"]["source"] == "seek"
+    assert by_id["in-abc"]["source"] == "indeed"
+    assert "description" not in by_id["in-abc"]
