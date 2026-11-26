@@ -1,7 +1,7 @@
 """Shared filters for job search results."""
 import re
 
-SCORE_VERSION = "cv-rules-v3"
+SCORE_VERSION = "cv-rules-v4"
 
 ROLE_PATTERNS = {
     "IA complémentaire": re.compile(r"\b(?:junior\s+)?ai\s+(?:engineer|infrastructure|platform)\b|\b(?:mlops|llmops|genai|generative\s+ai|machine\s+learning\s+ops)\b", re.I),

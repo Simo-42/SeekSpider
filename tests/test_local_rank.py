@@ -404,7 +404,7 @@ def test_resume_retries_unavailable_ai_only_when_ollama_is_up(tmp_path):
     model.assert_not_called()
 
     recovered = rank.refresh_existing_analysis(
-        {"points_forts": ["Stack AWS/Terraform alignée"], "points_a_verifier": [], "modele": "lfm3:1.7b"},
+        {"points_forts": ["Stack AWS/Terraform alignée"], "points_a_verifier": [], "modele": rank.DEFAULT_MODEL},
         job, description, "",
     )
     with patch("sys.argv", ["local_rank", str(jobs), str(report), "--resume"]), \
@@ -413,8 +413,44 @@ def test_resume_retries_unavailable_ai_only_when_ollama_is_up(tmp_path):
          patch.object(rank, "analyze", return_value=recovered) as model:
         rank.main()
     fetch.assert_not_called()
-    model.assert_called_once_with(job, description, "", "lfm3:1.7b")
+    model.assert_called_once_with(job, description, "", rank.DEFAULT_MODEL)
     data = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))
     assert len(data["analyses"]) == 1
-    assert data["analyses"][0]["analyse"]["modele"] == "lfm3:1.7b"
+    assert data["analyses"][0]["analyse"]["modele"] == rank.DEFAULT_MODEL
     assert data["analyses"][0]["analyse"]["points_forts"] == ["Stack AWS/Terraform alignée"]
+
+
+def test_enriched_skill_patterns_match_vpc_networking_and_aws_services():
+    profile = "AWS (EC2, RDS, IAM, VPC, S3, SSM), Docker Compose, NGINX with TLS, OAuth2, Agile Scrum"
+    job = {"job_title": "Cloud Operations Engineer", "area": "Sydney NSW", "region": "Australia"}
+    score = rank.calculate_fit_score(
+        job, "Manage EC2, IAM, S3, VPC networking, CloudFormation and EKS clusters.", profile
+    )
+    assert set(score["competences_reperees"]) == {"EC2", "IAM", "S3", "Networking"}
+    assert set(score["competences_manquantes"]) == {"CloudFormation", "EKS / ECS"}
+
+
+def test_refresh_ai_updates_cached_offers_above_min_score_without_fetching(tmp_path):
+    jobs, report = tmp_path / "jobs.jsonl", tmp_path / "report.md"
+    high = {"job_id": "30", "job_title": "Cloud Engineer", "area": "Sydney NSW", "region": "Australia"}
+    low = {"job_id": "31", "job_title": "Service Desk Analyst", "area": "Brisbane QLD", "region": "Australia"}
+    jobs.write_text("\n".join(map(json.dumps, [high, low])), encoding="utf-8")
+    high_a = rank.refresh_existing_analysis({"modele": "lfm3:1.7b", "points_forts": [], "points_a_verifier": []}, high, "AWS Terraform Linux Kubernetes Docker 2 years experience", "AWS Terraform Linux Kubernetes Docker")
+    low_a = rank.refresh_existing_analysis({"modele": "lfm3:1.7b", "points_forts": [], "points_a_verifier": []}, low, "Microsoft 365 Intune", "AWS")
+    report.with_suffix(".json").write_text(json.dumps({"analyses": [
+        {"offre": high, "analyse": high_a, "description": "AWS Terraform Linux Kubernetes Docker 2 years experience"},
+        {"offre": low, "analyse": low_a, "description": "Microsoft 365 Intune"},
+    ], "echecs": []}), encoding="utf-8")
+    upgraded = {**high_a, "modele": "qwen3:14b", "points_forts": ["Stack AWS/Terraform confirmée"]}
+    with patch("sys.argv", ["local_rank", str(jobs), str(report), "--resume", "--refresh-ai", "--min-score", "70", "--model", "qwen3:14b"]), \
+         patch.object(rank, "ollama_available", return_value=True), \
+         patch.object(rank.fetcher, "fetch_job_detail") as fetch, \
+         patch.object(rank, "analyze", return_value=upgraded) as model:
+        rank.main()
+    fetch.assert_not_called()
+    model.assert_called_once()
+    assert model.call_args.args[0]["job_id"] == "30"
+    data = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))
+    by_id = {row["offre"]["job_id"]: row["analyse"] for row in data["analyses"]}
+    assert by_id["30"]["modele"] == "qwen3:14b"
+    assert by_id["31"]["modele"] == "lfm3:1.7b"
