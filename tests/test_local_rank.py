@@ -454,3 +454,23 @@ def test_refresh_ai_updates_cached_offers_above_min_score_without_fetching(tmp_p
     by_id = {row["offre"]["job_id"]: row["analyse"] for row in data["analyses"]}
     assert by_id["30"]["modele"] == "qwen3:14b"
     assert by_id["31"]["modele"] == "lfm3:1.7b"
+
+
+def test_off_target_domains_are_excluded_and_employers_are_tagged():
+    import job_filters
+    for title in (
+        "System Engineer (Electrical/Instrumentation & Control)",
+        "Graduate Control Systems Engineer",
+        "Systems Engineer - CCTV & FRT",
+        "z/OS Systems Engineer - CICS/MQ (NV1)",
+    ):
+        assert not job_filters.is_target_role({"job_title": title}), title
+    for title in ("AWS Cloud Engineer", "Linux Infrastructure Engineer", "Site Reliability Engineer", "IT Support Engineer"):
+        assert job_filters.is_target_role({"job_title": title}), title
+    assert job_filters.employer_tag({"business_name": "Talenza"}) == "agency"
+    assert job_filters.employer_tag({"business_name": "Green Light PS Pty Ltd"}) == "agency"
+    assert job_filters.employer_tag({"business_name": "AC3 Pty Limited"}) == "aws_msp"
+    assert job_filters.employer_tag({"business_name": "Versent"}) == "aws_msp"
+    assert job_filters.employer_tag({"business_name": "Bureau Of Meteorology"}) == "public_sector"
+    assert job_filters.employer_tag({"business_name": "NSW Department of Customer Service"}) == "public_sector"
+    assert job_filters.employer_tag({"business_name": "Myconnect"}) == ""

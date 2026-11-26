@@ -222,3 +222,16 @@ def test_triage_persistence_validation_and_state_filtering(tmp_path):
     assert server.save_triage_entry(report, "11", "todo", "   ") is None
     assert "11" not in server.read_triage(report)
     assert set(server.state(jobs, report, 3, "")["triage"]) == {"10"}
+
+
+def test_state_tags_employers_and_excludes_non_it_domains(tmp_path):
+    jobs, report = tmp_path / "jobs.jsonl", tmp_path / "report.md"
+    jobs.write_text("\n".join(map(json.dumps, [
+        {"job_id": "1", "job_title": "Cloud Engineer", "business_name": "Talenza"},
+        {"job_id": "2", "job_title": "Cloud Engineer", "business_name": "Versent"},
+        {"job_id": "3", "job_title": "Application Support Developer", "business_name": "Bureau Of Meteorology"},
+        {"job_id": "4", "job_title": "Systems Engineer - CCTV & FRT", "business_name": "Endeavour Group"},
+    ])), encoding="utf-8")
+    payload = server.state(jobs, report, 4, "")
+    tags = {j["job_id"]: j["employer_tag"] for j in payload["jobs"]}
+    assert tags == {"1": "agency", "2": "aws_msp", "3": "public_sector"}

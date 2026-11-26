@@ -11,8 +11,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 from cv_profile import profile_fingerprint, profile_summary
-from job_filters import (DEFAULT_MODEL, SCORE_VERSION, experience_evidence, experience_exclusion,
-                         is_senior, is_target_role, role_category, whv_flags)
+from job_filters import (DEFAULT_MODEL, SCORE_VERSION, employer_tag, experience_evidence,
+                         experience_exclusion, is_senior, is_target_role, role_category, whv_flags)
 
 TRIAGE_STATUSES = ("todo", "shortlist", "applied", "dismissed")
 
@@ -209,6 +209,7 @@ def state(jobs_path, report, total, container, profile=None, search_container=""
             and str(job["job_id"]) not in excluded_ids]
     for job in jobs:
         job["role_category"] = role_category(job)
+        job["employer_tag"] = employer_tag(job)
     visible_ids = {str(job["job_id"]) for job in jobs}
     analyses = {job_id: analysis for job_id, analysis in analyses.items() if job_id in visible_ids}
     current_ids = {job_id for job_id, analysis in analyses.items() if not analysis["score_obsolete"]}

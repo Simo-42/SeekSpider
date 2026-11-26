@@ -1904,6 +1904,43 @@
           </div>
 
           <div class="control-group">
+            <span class="control-label" id="freshness-label">Fraîcheur</span>
+            <div class="segmented-group" role="group" aria-labelledby="freshness-label">
+              <button type="button" class="seg-btn" data-freshness="all" aria-pressed="true">
+                <span>Toutes</span>
+                <span class="seg-count" id="count-fresh-all">0</span>
+              </button>
+              <button type="button" class="seg-btn" data-freshness="3" aria-pressed="false">
+                <span>≤ 3 j</span>
+                <span class="seg-count" id="count-fresh-3">0</span>
+              </button>
+              <button type="button" class="seg-btn" data-freshness="7" aria-pressed="false">
+                <span>≤ 7 j</span>
+                <span class="seg-count" id="count-fresh-7">0</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label">Cibles PVT</span>
+            <button
+              type="button"
+              class="toggle-btn"
+              id="pvt-targets-btn"
+              aria-pressed="false"
+              title="Agences IT contrat (Talenza, TalentWeb, Green Light, Hays, Paxus…) et partenaires AWS / MSP"
+            >
+              <span class="toggle-check" aria-hidden="true">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </span>
+              <span>Agences &amp; AWS/MSP</span>
+              <span class="seg-count" id="count-pvt-targets">0</span>
+            </button>
+          </div>
+
+          <div class="control-group">
             <span class="control-label">WHV 417</span>
             <button
               type="button"
@@ -2037,6 +2074,8 @@
         family: "all",
         triageFilter: "all",
         contract: "all",
+        freshness: "all",
+        pvtTargetsOnly: false,
         hideWhvBlocks: false,
         analysedOnly: false,
         sort: "score",
@@ -2112,6 +2151,12 @@
         countContractAll: document.getElementById("count-contract-all"),
         countContractContract: document.getElementById("count-contract-contract"),
         countContractFulltime: document.getElementById("count-contract-fulltime"),
+        freshnessBtns: Array.from(document.querySelectorAll("[data-freshness]")),
+        countFreshAll: document.getElementById("count-fresh-all"),
+        countFresh3: document.getElementById("count-fresh-3"),
+        countFresh7: document.getElementById("count-fresh-7"),
+        pvtTargetsBtn: document.getElementById("pvt-targets-btn"),
+        countPvtTargets: document.getElementById("count-pvt-targets"),
         hideWhvBlocksBtn: document.getElementById("hide-whv-blocks-btn"),
         countWhvBlocks: document.getElementById("count-whv-blocks"),
         analysedOnlyBtn: document.getElementById("analysed-only-btn"),
@@ -2388,6 +2433,7 @@
             job_title: asText(item.job_title, "Intitulé non précisé"),
             business_name: asText(item.business_name, "Entreprise non précisée"),
             role_category: asText(item.role_category, "Famille non classée"),
+            employer_tag: asText(item.employer_tag, ""),
             area: asText(item.area, "Localisation non précisée"),
             work_type: asText(item.work_type, ""),
             pay_range: asText(item.pay_range, ""),
@@ -2465,6 +2511,22 @@
         return haystacks.join(" ").toLowerCase().includes(query);
       }
 
+      function jobAgeDays(job) {
+        if (!job || job.postedTs === null) return null;
+        return Math.max(0, (Date.now() - job.postedTs) / 86400000);
+      }
+
+      function matchesFreshness(job, freshness) {
+        if (freshness === "all") return true;
+        const days = jobAgeDays(job);
+        if (days === null) return false;
+        return days <= Number(freshness);
+      }
+
+      function isPvtTarget(job) {
+        return Boolean(job && (job.employer_tag === "agency" || job.employer_tag === "aws_msp"));
+      }
+
       function getFilteredAndSortedJobs() {
         const query = state.search.trim().toLowerCase();
         const filtered = [];
@@ -2477,6 +2539,8 @@
           if (!matchesFamily(job, state.family)) continue;
           if (state.triageFilter !== "all" && triage.status !== state.triageFilter) continue;
           if (!matchesContract(job, state.contract)) continue;
+          if (!matchesFreshness(job, state.freshness)) continue;
+          if (state.pvtTargetsOnly && !isPvtTarget(job)) continue;
           if (state.hideWhvBlocks && hasWhvBlock(analysis)) continue;
           if (state.analysedOnly && !(analysis && analysis.score !== null)) continue;
           if (!matchesSearch(job, analysis, triage, query)) continue;
@@ -2796,6 +2860,9 @@
         let whvBlocks = 0;
         let contractCount = 0;
         let fulltimeCount = 0;
+        let fresh3 = 0;
+        let fresh7 = 0;
+        let pvtTargets = 0;
         const triageCounts = { todo: 0, shortlist: 0, applied: 0, dismissed: 0 };
         const familyCounts = Object.create(null);
         for (let f = 0; f < ROLE_FAMILIES.length; f += 1) {
@@ -2812,6 +2879,9 @@
           if (hasWhvBlock(analysis)) whvBlocks += 1;
           if (isContractWorkType(job.work_type)) contractCount += 1;
           if (isFullTimeWorkType(job.work_type)) fulltimeCount += 1;
+          if (matchesFreshness(job, "3")) fresh3 += 1;
+          if (matchesFreshness(job, "7")) fresh7 += 1;
+          if (isPvtTarget(job)) pvtTargets += 1;
           if (Object.prototype.hasOwnProperty.call(triageCounts, triage.status)) {
             triageCounts[triage.status] += 1;
           }
@@ -2831,6 +2901,10 @@
         els.countContractAll.textContent = String(state.jobs.length);
         els.countContractContract.textContent = String(contractCount);
         els.countContractFulltime.textContent = String(fulltimeCount);
+        els.countFreshAll.textContent = String(state.jobs.length);
+        els.countFresh3.textContent = String(fresh3);
+        els.countFresh7.textContent = String(fresh7);
+        els.countPvtTargets.textContent = String(pvtTargets);
         els.countWhvBlocks.textContent = String(whvBlocks);
         els.countAnalysedFilter.textContent = String(analysed);
 
@@ -2851,6 +2925,8 @@
           state.family !== "all" ||
           state.triageFilter !== "all" ||
           state.contract !== "all" ||
+          state.freshness !== "all" ||
+          state.pvtTargetsOnly ||
           state.hideWhvBlocks ||
           state.analysedOnly;
         els.resetFiltersBtn.hidden = !hasActiveFilters;
@@ -3008,6 +3084,34 @@
             contractPill.textContent = "Contract/Temp";
             contractPill.title = "Contrat court ou temporaire, adapté à la limite de 6 mois du WHV 417";
             badgesRow.appendChild(contractPill);
+          }
+
+          if (job.employer_tag === "agency" || job.employer_tag === "aws_msp") {
+            const empPill = document.createElement("span");
+            empPill.className = "job-badge badge-triage-applied";
+            empPill.textContent = job.employer_tag === "agency" ? "Agence IT" : "AWS / MSP";
+            empPill.title = job.employer_tag === "agency"
+              ? "Agence de recrutement IT (contrats courts / placements rapides en PVT 417)"
+              : "Partenaire AWS, cabinet cloud ou MSP australien";
+            badgesRow.appendChild(empPill);
+          } else if (job.employer_tag === "public_sector") {
+            const pubPill = document.createElement("span");
+            pubPill.className = "job-badge badge-warning";
+            pubPill.appendChild(createSvgIcon("alert"));
+            const pubTxt = document.createElement("span");
+            pubTxt.textContent = "Secteur public";
+            pubPill.appendChild(pubTxt);
+            pubPill.title = "Organisme public / conseil / gouvernement : vérifier l'exigence de citoyenneté australienne";
+            badgesRow.appendChild(pubPill);
+          }
+
+          const ageDays = jobAgeDays(job);
+          if (ageDays !== null && ageDays > 21) {
+            const oldPill = document.createElement("span");
+            oldPill.className = "job-badge badge-triage-dismissed";
+            oldPill.textContent = "> 21 j";
+            oldPill.title = "Annonce publiée il y a plus de 21 jours : vérifier qu'elle est encore ouverte sur SEEK";
+            badgesRow.appendChild(oldPill);
           }
 
           if (whvFlags.clearance) {
@@ -3747,10 +3851,13 @@
         state.family = "all";
         state.triageFilter = "all";
         state.contract = "all";
+        state.freshness = "all";
+        state.pvtTargetsOnly = false;
         state.hideWhvBlocks = false;
         state.analysedOnly = false;
         els.searchInput.value = "";
         els.familySelect.value = "all";
+        els.pvtTargetsBtn.setAttribute("aria-pressed", "false");
         els.hideWhvBlocksBtn.setAttribute("aria-pressed", "false");
         els.analysedOnlyBtn.setAttribute("aria-pressed", "false");
         for (let i = 0; i < els.regionBtns.length; i += 1) {
@@ -3761,6 +3868,9 @@
         }
         for (let i = 0; i < els.contractBtns.length; i += 1) {
           els.contractBtns[i].setAttribute("aria-pressed", els.contractBtns[i].dataset.contract === "all" ? "true" : "false");
+        }
+        for (let i = 0; i < els.freshnessBtns.length; i += 1) {
+          els.freshnessBtns[i].setAttribute("aria-pressed", els.freshnessBtns[i].dataset.freshness === "all" ? "true" : "false");
         }
         renderAll();
         els.searchInput.focus();
@@ -4038,6 +4148,27 @@
           renderAll();
         });
       }
+
+      for (let i = 0; i < els.freshnessBtns.length; i += 1) {
+        els.freshnessBtns[i].addEventListener("click", function (event) {
+          const btn = event.currentTarget;
+          const nextFreshness = btn.dataset.freshness || "all";
+          state.freshness = nextFreshness;
+          for (let j = 0; j < els.freshnessBtns.length; j += 1) {
+            els.freshnessBtns[j].setAttribute(
+              "aria-pressed",
+              els.freshnessBtns[j].dataset.freshness === nextFreshness ? "true" : "false"
+            );
+          }
+          renderAll();
+        });
+      }
+
+      els.pvtTargetsBtn.addEventListener("click", function () {
+        state.pvtTargetsOnly = !state.pvtTargetsOnly;
+        els.pvtTargetsBtn.setAttribute("aria-pressed", state.pvtTargetsOnly ? "true" : "false");
+        renderAll();
+      });
 
       els.hideWhvBlocksBtn.addEventListener("click", function () {
         state.hideWhvBlocks = !state.hideWhvBlocks;

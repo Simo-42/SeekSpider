@@ -14,6 +14,29 @@ PRIORITY_ROLE = re.compile(
     r"\b(?:(?:aws\s+)?cloud\s+engineer|junior\s+devops\s+engineer|site\s+reliability\s+engineer|sre|cloud\s+support\s+(?:engineer|associate)|cloud\s+operations\s+engineer)\b",
     re.I,
 )
+OFF_TARGET_DOMAIN = re.compile(
+    r"\b(?:electrical|instrumentation|control\s+systems?|cctv|mainframe|z/os|cics/mq|"
+    r"mechatronic|mechanical|civil|mining|building\s+services)\b",
+    re.I,
+)
+PUBLIC_SECTOR_EMPLOYER = re.compile(
+    r"\b(?:department\s+of|bureau\s+of\s+meteorology|government|council|defence|defense|"
+    r"services\s+australia|csiro|australian\s+nuclear|police|ato)\b",
+    re.I,
+)
+IT_AGENCY_EMPLOYER = re.compile(
+    r"\b(?:talenza|talentweb|green\s+light|paxus|finite|hays|launch\s+recruitment|"
+    r"davidson|robert\s+half|talent\s+international|finxl|pm-partners|thedrivegroup|"
+    r"randstad|michael\s+page|hudson|peoplebank|click\s+recruiting|pra|opus\s+recruitment|"
+    r"greythorn|modis|akkodis|tek\s*systems)\b",
+    re.I,
+)
+AWS_MSP_EMPLOYER = re.compile(
+    r"\b(?:versent|mantel|cevo|ac3|datacom|brennan|interactive|dius|cmd\s+solutions|"
+    r"kinetic\s+it|data#3|macquarie\s+cloud|rackspace|nec|insight|slalom|kasna|"
+    r"innablr|servian|deloitte|accenture|capgemini|infosys|wipro|cognizant)\b",
+    re.I,
+)
 WHV_RESTRICTIVE_VISA = re.compile(
     r"\b(?:citizen(?:s|ship)?|permanent\s+residen(?:ts?|cy)|pr\s+only|"
     r"no\s+(?:visa\s+)?sponsor(?:ship|ing)?|"
@@ -30,10 +53,26 @@ WHV_RESTRICTIVE_VISA = re.compile(
 
 def role_category(job):
     title = job if isinstance(job, str) else (job.get("job_title") or "")
+    if OFF_TARGET_DOMAIN.search(title):
+        return "Hors cible"
     for category, pattern in ROLE_PATTERNS.items():
         if pattern.search(title):
             return category
     return "Hors cible"
+
+
+def employer_tag(job):
+    """Classify employer into public_sector, agency, aws_msp, or empty string."""
+    name = job if isinstance(job, str) else (job.get("business_name") or "")
+    if not name.strip():
+        return ""
+    if PUBLIC_SECTOR_EMPLOYER.search(name):
+        return "public_sector"
+    if IT_AGENCY_EMPLOYER.search(name):
+        return "agency"
+    if AWS_MSP_EMPLOYER.search(name):
+        return "aws_msp"
+    return ""
 
 
 def role_tier(job):
