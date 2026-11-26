@@ -2,6 +2,7 @@
 import argparse
 import json
 import math
+import os
 import re
 import subprocess
 import threading
@@ -11,7 +12,61 @@ from pathlib import Path
 from urllib.parse import urlparse
 from cv_profile import profile_fingerprint, profile_summary
 from job_filters import (SCORE_VERSION, experience_evidence, experience_exclusion,
-                         is_senior, is_target_role, role_category)
+                         is_senior, is_target_role, role_category, whv_flags)
+
+TRIAGE_STATUSES = ("todo", "shortlist", "applied", "dismissed")
+
+
+def triage_path(report: Path) -> Path:
+    return report.with_name(report.stem + ".triage.json")
+
+
+def read_triage(report: Path) -> dict:
+    path = triage_path(report)
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError):
+        return {}
+    if not isinstance(raw, dict):
+        return {}
+    triage = {}
+    for job_id, entry in raw.items():
+        if not isinstance(job_id, str) or not job_id.strip() or not isinstance(entry, dict):
+            continue
+        status = entry.get("status")
+        note = entry.get("note", "")
+        updated_at = entry.get("updated_at")
+        if (status in TRIAGE_STATUSES and isinstance(note, str) and len(note) <= 500
+                and isinstance(updated_at, (int, float)) and not isinstance(updated_at, bool)
+                and math.isfinite(updated_at)):
+            triage[job_id] = {"status": status, "note": note, "updated_at": updated_at}
+    return triage
+
+
+def save_triage_entry(report: Path, job_id: str, status: str, note: str = "") -> dict | None:
+    if not isinstance(job_id, str) or not job_id.strip():
+        raise ValueError("Identifiant d'offre invalide.")
+    if not isinstance(status, str) or status not in TRIAGE_STATUSES:
+        raise ValueError("Statut de triage invalide.")
+    if not isinstance(note, str):
+        raise ValueError("La note doit être un texte.")
+    job_id = job_id.strip()
+    note = note.strip()
+    if len(note) > 500:
+        raise ValueError("La note ne peut pas dépasser 500 caractères.")
+    data = read_triage(report)
+    if status == "todo" and note == "":
+        data.pop(job_id, None)
+        entry = None
+    else:
+        entry = {"status": status, "note": note, "updated_at": round(time.time(), 3)}
+        data[job_id] = entry
+    path = triage_path(report)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp, path)
+    return entry
 
 
 def read_jobs(path, include_senior=False):
@@ -137,6 +192,7 @@ def state(jobs_path, report, total, container, profile=None, search_container=""
                 and not re.search(r"\b(?:visa|sponsor\w*|work(?:ing)?\s+rights?|right\s+to\s+work)\b", old_visa, re.I)):
             updated["preuve_visa"] = "Aucun extrait pertinent repéré automatiquement"
             updated["visa_sponsoring"] = "Visa et droit au travail à vérifier dans l'annonce."
+        updated["whv_flags"] = whv_flags(updated)
         analyses[job_id] = updated
     running = container_running(container)
     searching = container_running(search_container)
@@ -168,7 +224,8 @@ def state(jobs_path, report, total, container, profile=None, search_container=""
         status = "stopped"
         message = (f"Analyse en pause : {stale} score(s) à recalculer, {pending - stale} offre(s) à analyser, {failures} échec(s) à réessayer" if pending or failures
                    else "Analyse en pause ; les résultats enregistrés sont conservés")
-    return {"jobs": jobs, "analyses": analyses, "profile": profile_summary(profile_text),
+    triage = {job_id: entry for job_id, entry in read_triage(report).items() if job_id in visible_ids}
+    return {"jobs": jobs, "analyses": analyses, "triage": triage, "profile": profile_summary(profile_text),
             "search": search_state(jobs_path, searching, running),
             "progress": {"completed": completed, "total": len(jobs), "status": status, "message": message,
                          "excluded": len(all_jobs) - len(jobs),
@@ -248,10 +305,12 @@ def main():
                 content, content_type = html.read_bytes(), "text/html; charset=utf-8"
             elif route == "/api/state":
                 payload = current_state()
-                if handoff["pending"]:
+                with lock:
+                    pending, handoff_message = handoff["pending"], handoff["message"]
+                if pending:
                     payload["search"]["can_start"] = payload["progress"]["can_start"] = False
                 if payload["search"]["status"] == "finished":
-                    message = "Démarrage de l’analyse des nouvelles offres…" if handoff["pending"] else handoff["message"]
+                    message = "Démarrage de l’analyse des nouvelles offres…" if pending else handoff_message
                     if message:
                         payload["search"]["message"] += " " + message
                 content = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -277,8 +336,9 @@ def main():
                 length = int(self.headers.get("Content-Length", "0"))
                 if length > 4096 or length < 0:
                     raise ValueError("Requête trop volumineuse")
-                self.rfile.read(length)
+                body = self.rfile.read(length)
                 route = urlparse(self.path).path
+                payload, code = {"ok": True}, 200
                 with lock:
                     if route == "/api/search/start":
                         if handoff["pending"] or container_running(container) or container_running(search_container):
@@ -302,10 +362,23 @@ def main():
                         result = subprocess.run(["docker", "stop", "-t", "15", container], capture_output=True, text=True, timeout=25)
                         if result.returncode:
                             raise ValueError("Impossible d'arrêter l'analyse.")
+                    elif route == "/api/triage":
+                        try:
+                            data = json.loads(body.decode("utf-8")) if body else None
+                        except (UnicodeDecodeError, ValueError) as exc:
+                            raise ValueError("Corps JSON invalide.") from exc
+                        if not isinstance(data, dict):
+                            raise ValueError("Corps JSON invalide.")
+                        entry = save_triage_entry(
+                            args.report,
+                            data.get("job_id"),
+                            data.get("status"),
+                            data.get("note", ""),
+                        )
+                        payload = {"ok": True, "triage": entry}
                     else:
                         self.send_error(404)
                         return
-                payload, code = {"ok": True}, 200
             except (ValueError, OSError, subprocess.TimeoutExpired) as exc:
                 payload, code = {"error": str(exc)}, 400
             content = json.dumps(payload, ensure_ascii=False).encode("utf-8")

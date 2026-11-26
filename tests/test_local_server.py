@@ -155,3 +155,70 @@ def test_legacy_search_previews_do_not_appear_as_new_ads(tmp_path):
     state = server.search_state(jobs, False, False)
     assert state["new_jobs"] == 3 and state["discovered_jobs"] is None
     assert state["recent_new_jobs"] == []
+
+
+def test_state_exposes_whv_flags_and_ignores_cleaned_legacy_eeo_quote(tmp_path):
+    jobs, report = tmp_path / "jobs.jsonl", tmp_path / "report.md"
+    jobs.write_text("\n".join(json.dumps({"job_id": str(i), "job_title": "Cloud Engineer"}) for i in range(1, 5)), encoding="utf-8")
+    data = {"analyses": [
+        {"offre": {"job_id": "1"}, "analyse": {
+            "preuve_habilitation": "Must hold an NV1 security clearance.",
+            "preuve_visa": "Aucun extrait repéré"}},
+        {"offre": {"job_id": "2"}, "analyse": {
+            "preuve_habilitation": "Aucun extrait repéré",
+            "preuve_visa": "Applicants must be an Australian citizen or permanent resident."}},
+        {"offre": {"job_id": "3"}, "analyse": {
+            "preuve_habilitation": "Aucun extrait repéré",
+            "preuve_visa": "Aucun extrait repéré"}},
+        {"offre": {"job_id": "4"}, "analyse": {
+            "preuve_visa": "Equal opportunity regardless of race, colour, religion, citizenship, or age."}},
+    ]}
+    report.with_suffix(".json").write_text(json.dumps(data), encoding="utf-8")
+    analyses = server.state(jobs, report, 4, "")["analyses"]
+    assert analyses["1"]["whv_flags"] == {"clearance": True, "citizen_pr_risk": False, "visa_mention": False}
+    assert analyses["2"]["whv_flags"] == {"clearance": False, "citizen_pr_risk": True, "visa_mention": True}
+    assert analyses["3"]["whv_flags"] == {"clearance": False, "citizen_pr_risk": False, "visa_mention": False}
+    assert analyses["4"]["whv_flags"] == {"clearance": False, "citizen_pr_risk": False, "visa_mention": False}
+
+
+def test_triage_persistence_validation_and_state_filtering(tmp_path):
+    jobs, report = tmp_path / "jobs.jsonl", tmp_path / "nested" / "report.md"
+    jobs.write_text("\n".join([
+        json.dumps({"job_id": "10", "job_title": "Cloud Engineer"}),
+        json.dumps({"job_id": "11", "job_title": "DevOps Engineer"}),
+        json.dumps({"job_id": "12", "job_title": "Senior Cloud Engineer"}),
+    ]), encoding="utf-8")
+
+    shortlist = server.save_triage_entry(report, "10", "shortlist", "  Bon fit AWS  ")
+    applied = server.save_triage_entry(report, "11", "applied", "Candidature envoyée")
+    dismissed = server.save_triage_entry(report, "12", "dismissed", "Trop senior")
+    assert shortlist["status"] == "shortlist" and shortlist["note"] == "Bon fit AWS"
+    assert isinstance(shortlist["updated_at"], (int, float))
+    assert applied["status"] == "applied" and dismissed["status"] == "dismissed"
+
+    saved = server.read_triage(report)
+    assert set(saved) == {"10", "11", "12"}
+    assert saved["10"]["note"] == "Bon fit AWS"
+
+    payload = server.state(jobs, report, 3, "")
+    assert set(payload["triage"]) == {"10", "11"}
+    assert payload["triage"]["10"]["status"] == "shortlist"
+
+    for args in (
+        ("", "shortlist", ""),
+        ("   ", "shortlist", ""),
+        (10, "shortlist", ""),
+        ("10", "invalid", ""),
+        ("10", "shortlist", "x" * 501),
+        ("10", "shortlist", 42),
+    ):
+        try:
+            server.save_triage_entry(report, *args)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"Expected ValueError for {args!r}")
+
+    assert server.save_triage_entry(report, "11", "todo", "   ") is None
+    assert "11" not in server.read_triage(report)
+    assert set(server.state(jobs, report, 3, "")["triage"]) == {"10"}

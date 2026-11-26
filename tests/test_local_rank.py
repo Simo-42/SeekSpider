@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlparse
 spec = importlib.util.spec_from_file_location("local_rank", Path(__file__).resolve().parents[1] / "local_rank.py")
 rank = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(rank)
+import job_filters
 
 
 def test_deduplicates_and_prioritizes(tmp_path):
@@ -29,7 +30,7 @@ def test_role_families_are_prioritized_and_noise_is_removed(tmp_path):
             {"job_id": "5", "job_title": "Infrastructure Engineer", "area": "Sydney NSW"}]
     path = tmp_path / "jobs.jsonl"
     path.write_text("\n".join(map(json.dumps, jobs)), encoding="utf-8")
-    assert [job["job_id"] for job in rank.select_jobs(path, 20)] == ["5", "3", "2", "1"]
+    assert [job["job_id"] for job in rank.select_jobs(path, 20)] == ["3", "5", "2", "1"]
 
 
 def test_senior_title_variants_exclude_without_hiding_junior_titles():
@@ -47,11 +48,53 @@ def test_fit_score_is_deterministic_and_rewards_profile_skill_overlap():
     weak = rank.calculate_fit_score(job, "Customer service and stakeholder communication", profile)
     assert strong["score_method"] == rank.SCORE_VERSION
     assert strong["score"] > weak["score"]
-    assert strong["score_role"] == 18 and strong["score_location"] == 5
+    assert strong["score_role"] == 20 and strong["score_location"] == 5
     assert strong["score_skills"] == 60
     assert strong["competences_reperees"] == ["AWS", "Terraform", "Kubernetes", "Linux"]
-    assert strong["score"] == 87
+    assert strong["score"] == 89
     assert "Aucune compétence reconnue" in weak["resume"]
+
+
+def test_priority_role_scoring():
+    for title in ("AWS Cloud Engineer", "Cloud Engineer", "Junior DevOps Engineer",
+                  "Site Reliability Engineer", "SRE", "Cloud Support Engineer",
+                  "Cloud Support Associate", "Cloud Operations Engineer"):
+        score = rank.calculate_fit_score({"job_title": title}, "AWS", "AWS")
+        assert score["score_role"] == 20, title
+    infra = rank.calculate_fit_score({"job_title": "Infrastructure Engineer"}, "AWS", "AWS")
+    assert infra["score_role"] == 15
+
+
+def test_whv_flags_detects_clearance_restrictions_and_placeholders():
+    assert job_filters.whv_flags({
+        "preuve_habilitation": "NV1 security clearance is required.",
+        "preuve_visa": "Aucun extrait repéré",
+    }) == {"clearance": True, "citizen_pr_risk": False, "visa_mention": False}
+
+    for excerpt in (
+        "Only Australian citizens are eligible.",
+        "Australian permanent residents may apply.",
+        "PR only for this role.",
+        "No visa sponsorship is available.",
+        "Unable to provide visa sponsorship.",
+        "Applicants must have full working rights in Australia.",
+        "No WHV candidates.",
+    ):
+        assert job_filters.whv_flags({"preuve_visa": excerpt}) == {
+            "clearance": False, "citizen_pr_risk": True, "visa_mention": True
+        }, excerpt
+
+    assert job_filters.whv_flags({
+        "preuve_visa": "Visa sponsorship is available for eligible applicants.",
+        "preuve_habilitation": "Non précisé",
+    }) == {"clearance": False, "citizen_pr_risk": False, "visa_mention": True}
+
+    for placeholder in (None, "", "   ", "non précisé", "Non précisé", "Aucun extrait repéré", "aucun extrait trouvé"):
+        assert job_filters.whv_flags({
+            "preuve_visa": placeholder,
+            "preuve_habilitation": placeholder,
+        }) == {"clearance": False, "citizen_pr_risk": False, "visa_mention": False}, placeholder
+    assert job_filters.whv_flags(None) == {"clearance": False, "citizen_pr_risk": False, "visa_mention": False}
 
 
 def test_fit_uses_offer_skills_and_target_experience():
@@ -70,6 +113,7 @@ def test_unavailable_model_keeps_score_and_source_evidence():
     description = "2 years of experience with AWS. Visa sponsorship is unavailable."
     with patch.object(rank.requests, "post", side_effect=rank.requests.ConnectionError):
         result = rank.analyze({"job_title": "Cloud Engineer"}, description, "AWS", "test")
+    assert result["modele"] == rank.AI_UNAVAILABLE_MODEL
     assert result["score_skills"] > 0
     assert result["preuve_visa"] in description
     assert not result["points_forts"]
@@ -335,3 +379,42 @@ def test_analysis_after_search_only_processes_added_job_ids(tmp_path):
     data = json.loads(report.with_suffix(".json").read_text())
     assert [row["offre"]["job_id"] for row in data["analyses"]] == ["5"]
     assert data["echecs"][0]["job"]["job_id"] == "6"
+
+
+def test_resume_retries_unavailable_ai_only_when_ollama_is_up(tmp_path):
+    jobs, report = tmp_path / "jobs.jsonl", tmp_path / "report.md"
+    job = {"job_id": "20", "job_title": "Cloud Engineer"}
+    description = "Requires 2 years of experience with AWS and Terraform."
+    jobs.write_text(json.dumps(job), encoding="utf-8")
+    unavailable = rank.refresh_existing_analysis(
+        {"points_forts": [], "points_a_verifier": [], "modele": rank.AI_UNAVAILABLE_MODEL},
+        job, description, "",
+    )
+    report.with_suffix(".json").write_text(json.dumps({
+        "analyses": [{"offre": job, "analyse": unavailable, "description": description}],
+        "echecs": [],
+    }), encoding="utf-8")
+
+    with patch("sys.argv", ["local_rank", str(jobs), str(report), "--resume"]), \
+         patch.object(rank, "ollama_available", return_value=False), \
+         patch.object(rank.fetcher, "fetch_job_detail") as fetch, \
+         patch.object(rank, "analyze") as model:
+        rank.main()
+    fetch.assert_not_called()
+    model.assert_not_called()
+
+    recovered = rank.refresh_existing_analysis(
+        {"points_forts": ["Stack AWS/Terraform alignée"], "points_a_verifier": [], "modele": "lfm3:1.7b"},
+        job, description, "",
+    )
+    with patch("sys.argv", ["local_rank", str(jobs), str(report), "--resume"]), \
+         patch.object(rank, "ollama_available", return_value=True), \
+         patch.object(rank.fetcher, "fetch_job_detail") as fetch, \
+         patch.object(rank, "analyze", return_value=recovered) as model:
+        rank.main()
+    fetch.assert_not_called()
+    model.assert_called_once_with(job, description, "", "lfm3:1.7b")
+    data = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))
+    assert len(data["analyses"]) == 1
+    assert data["analyses"][0]["analyse"]["modele"] == "lfm3:1.7b"
+    assert data["analyses"][0]["analyse"]["points_forts"] == ["Stack AWS/Terraform alignée"]

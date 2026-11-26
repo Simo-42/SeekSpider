@@ -270,6 +270,9 @@
       opacity: 0.55;
       cursor: not-allowed;
     }
+    .btn[hidden] {
+      display: none;
+    }
 
     .btn-primary {
       background: var(--accent-btn-bg);
@@ -725,9 +728,20 @@
       border-radius: var(--radius-lg);
       padding: 14px 16px;
       display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .controls-row {
+      display: flex;
       flex-wrap: wrap;
       align-items: flex-end;
-      gap: 12px 16px;
+      gap: 10px 12px;
+    }
+
+    .controls-row-secondary {
+      padding-top: 12px;
+      border-top: 1px solid var(--border-subtle);
     }
 
     .control-group {
@@ -739,6 +753,10 @@
     .control-group.search-group {
       flex: 1 1 260px;
       min-width: 220px;
+    }
+
+    .control-group.select-group {
+      min-width: 175px;
     }
 
     .control-label {
@@ -781,6 +799,10 @@
     .select-input:focus {
       border-color: var(--accent);
     }
+    .text-input::placeholder {
+      color: var(--text-muted);
+      opacity: 1;
+    }
 
     .search-field .text-input {
       padding-left: 34px;
@@ -820,7 +842,7 @@
 
     .seg-btn {
       min-height: 32px;
-      padding: 5px 11px;
+      padding: 5px 9px;
       border: 1px solid transparent;
       border-radius: 4px;
       background: transparent;
@@ -831,7 +853,7 @@
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
       font-variant-numeric: tabular-nums;
       transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
     }
@@ -891,10 +913,16 @@
       place-items: center;
       flex-shrink: 0;
     }
+    .toggle-check svg {
+      opacity: 0;
+    }
     .toggle-btn[aria-pressed="true"] .toggle-check {
       border-color: var(--accent);
       background: var(--accent);
       color: #082026;
+    }
+    .toggle-btn[aria-pressed="true"] .toggle-check svg {
+      opacity: 1;
     }
 
     /* Workspace Master-Detail */
@@ -982,6 +1010,68 @@
       font-size: 0.84375rem;
       color: var(--text-secondary);
       overflow-wrap: anywhere;
+    }
+
+    .job-badges-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .job-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 8px;
+      border-radius: var(--radius-pill);
+      font-size: 0.75rem;
+      font-weight: 600;
+      line-height: 1.35;
+      border: 1px solid var(--neutral-badge-border);
+      background: var(--neutral-badge-bg);
+      color: var(--neutral-badge-text);
+    }
+    .job-badge svg {
+      width: 12px;
+      height: 12px;
+      flex-shrink: 0;
+    }
+    .job-badge.badge-family {
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: var(--bg-inset);
+      border-color: var(--border-subtle);
+    }
+    .job-badge.badge-contract {
+      color: var(--accent);
+      background: var(--accent-bg);
+      border-color: var(--border-accent);
+    }
+    .job-badge.badge-danger {
+      color: var(--danger-text);
+      background: var(--danger-bg);
+      border-color: var(--danger-border);
+    }
+    .job-badge.badge-warning {
+      color: var(--warning-text);
+      background: var(--warning-bg);
+      border-color: var(--warning-border);
+    }
+    .job-badge.badge-shortlist {
+      color: var(--accent);
+      background: var(--accent-bg);
+      border-color: var(--border-accent);
+    }
+    .job-badge.badge-applied {
+      color: var(--success-text);
+      background: var(--success-bg);
+      border-color: var(--success-border);
+    }
+    .job-badge.badge-dismissed {
+      color: var(--text-muted);
+      background: var(--bg-inset);
+      border-color: var(--border-strong);
     }
 
     .job-meta-row {
@@ -1143,6 +1233,72 @@
       align-items: center;
       gap: 10px;
       margin-top: 2px;
+    }
+
+    .triage-box {
+      margin-top: 4px;
+      padding: 12px 14px;
+      border-radius: var(--radius-md);
+      background: var(--bg-inset);
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .triage-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .triage-feedback {
+      font-size: 0.78125rem;
+      font-weight: 500;
+      color: var(--text-muted);
+      min-height: 1.2em;
+    }
+    .triage-feedback.is-saved {
+      color: var(--success-text);
+    }
+    .triage-feedback.is-error {
+      color: var(--danger-text);
+    }
+
+    .triage-segmented {
+      background: var(--bg-surface);
+      width: fit-content;
+      max-width: 100%;
+    }
+    .triage-segmented .seg-btn[data-triage-status="applied"][aria-pressed="true"] {
+      background: var(--success-bg);
+      color: var(--success-text);
+      border-color: var(--success-border);
+    }
+    .triage-segmented .seg-btn[data-triage-status="dismissed"][aria-pressed="true"] {
+      background: var(--neutral-badge-bg);
+      color: var(--text-primary);
+      border-color: var(--border-strong);
+    }
+
+    .triage-note-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+    }
+
+    .triage-note-input {
+      flex: 1 1 auto;
+      min-height: 52px;
+      resize: vertical;
+      line-height: 1.45;
+    }
+
+    .triage-save-btn {
+      flex-shrink: 0;
+      min-height: 38px;
     }
 
     .link-unavailable {
@@ -1463,6 +1619,10 @@
       .progress-actions .btn {
         flex: 1 1 auto;
       }
+      .triage-note-row {
+        flex-direction: column;
+        align-items: stretch;
+      }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -1639,62 +1799,140 @@
       </details>
 
       <section class="controls-panel" aria-label="Recherche, filtres et tri">
-        <div class="control-group search-group">
-          <label for="search-input" class="control-label">Rechercher</label>
-          <div class="search-field">
-            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-            <input
-              type="search"
-              id="search-input"
-              class="text-input"
-              placeholder="Intitulé, entreprise, ville, résumé…"
-              autocomplete="off"
-              spellcheck="false"
-            >
-            <button type="button" id="clear-search-btn" class="clear-search-btn" hidden>Effacer</button>
-          </div>
-        </div>
-
-        <div class="control-group">
-          <span class="control-label" id="region-label">Zone</span>
-          <div class="segmented-group" role="group" aria-labelledby="region-label">
-            <button type="button" class="seg-btn" data-region="all" aria-pressed="true">
-              <span>Australie</span>
-              <span class="seg-count" id="count-region-all">0</span>
-            </button>
-            <button type="button" class="seg-btn" data-region="sydney" aria-pressed="false">
-              <span>Sydney</span>
-              <span class="seg-count" id="count-region-sydney">0</span>
-            </button>
-            <button type="button" class="seg-btn" data-region="melbourne" aria-pressed="false">
-              <span>Melbourne</span>
-              <span class="seg-count" id="count-region-melbourne">0</span>
-            </button>
-          </div>
-        </div>
-
-        <div class="control-group">
-          <span class="control-label">Analyse</span>
-          <button type="button" class="toggle-btn" id="analysed-only-btn" aria-pressed="false">
-            <span class="toggle-check" aria-hidden="true">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="20 6 9 17 4 12"></polyline>
+        <div class="controls-row">
+          <div class="control-group search-group">
+            <label for="search-input" class="control-label">Rechercher</label>
+            <div class="search-field">
+              <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
-            </span>
-            <span>Analyses disponibles uniquement</span>
-            <span class="seg-count" id="count-analysed-filter">0</span>
-          </button>
+              <input
+                type="search"
+                id="search-input"
+                class="text-input"
+                placeholder="Intitulé, entreprise, famille, ville, note…"
+                autocomplete="off"
+                spellcheck="false"
+              >
+              <button type="button" id="clear-search-btn" class="clear-search-btn" hidden>Effacer</button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label" id="region-label">Zone</span>
+            <div class="segmented-group" role="group" aria-labelledby="region-label">
+              <button type="button" class="seg-btn" data-region="all" aria-pressed="true">
+                <span>Australie</span>
+                <span class="seg-count" id="count-region-all">0</span>
+              </button>
+              <button type="button" class="seg-btn" data-region="sydney" aria-pressed="false">
+                <span>Sydney</span>
+                <span class="seg-count" id="count-region-sydney">0</span>
+              </button>
+              <button type="button" class="seg-btn" data-region="melbourne" aria-pressed="false">
+                <span>Melbourne</span>
+                <span class="seg-count" id="count-region-melbourne">0</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="control-group select-group">
+            <label for="family-select" class="control-label">Famille</label>
+            <select id="family-select" class="select-input">
+              <option value="all">Toutes les familles (0)</option>
+              <option value="Cloud &amp; DevOps">Cloud &amp; DevOps (0)</option>
+              <option value="Infrastructure">Infrastructure (0)</option>
+              <option value="Support IT">Support IT (0)</option>
+              <option value="IA complémentaire">IA complémentaire (0)</option>
+            </select>
+          </div>
+
+          <div class="control-group">
+            <label for="sort-select" class="control-label">Trier par</label>
+            <select id="sort-select" class="select-input">
+              <option value="score">Meilleur score</option>
+              <option value="recent">Récence</option>
+            </select>
+          </div>
         </div>
 
-        <div class="control-group">
-          <label for="sort-select" class="control-label">Trier par</label>
-          <select id="sort-select" class="select-input">
-            <option value="score">Meilleur score</option>
-            <option value="recent">Récence</option>
-          </select>
+        <div class="controls-row controls-row-secondary">
+          <div class="control-group">
+            <span class="control-label" id="triage-filter-label">Suivi</span>
+            <div class="segmented-group" role="group" aria-labelledby="triage-filter-label">
+              <button type="button" class="seg-btn" data-triage-filter="all" aria-pressed="true">
+                <span>Toutes</span>
+                <span class="seg-count" id="count-triage-all">0</span>
+              </button>
+              <button type="button" class="seg-btn" data-triage-filter="todo" aria-pressed="false">
+                <span>Non traitées</span>
+                <span class="seg-count" id="count-triage-todo">0</span>
+              </button>
+              <button type="button" class="seg-btn" data-triage-filter="shortlist" aria-pressed="false">
+                <span>À postuler</span>
+                <span class="seg-count" id="count-triage-shortlist">0</span>
+              </button>
+              <button type="button" class="seg-btn" data-triage-filter="applied" aria-pressed="false">
+                <span>Postulées</span>
+                <span class="seg-count" id="count-triage-applied">0</span>
+              </button>
+              <button type="button" class="seg-btn" data-triage-filter="dismissed" aria-pressed="false">
+                <span>Écartées</span>
+                <span class="seg-count" id="count-triage-dismissed">0</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label" id="contract-label">Contrat</span>
+            <div class="segmented-group" role="group" aria-labelledby="contract-label">
+              <button type="button" class="seg-btn" data-contract="all" aria-pressed="true">
+                <span>Tous</span>
+                <span class="seg-count" id="count-contract-all">0</span>
+              </button>
+              <button type="button" class="seg-btn" data-contract="contract" aria-pressed="false">
+                <span>Contract/Temp</span>
+                <span class="seg-count" id="count-contract-contract">0</span>
+              </button>
+              <button type="button" class="seg-btn" data-contract="fulltime" aria-pressed="false">
+                <span>Full time</span>
+                <span class="seg-count" id="count-contract-fulltime">0</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label">WHV 417</span>
+            <button
+              type="button"
+              class="toggle-btn"
+              id="hide-whv-blocks-btn"
+              aria-pressed="false"
+              title="Filtre réversible : masque temporairement les offres mentionnant une habilitation de sécurité ou une restriction Citizen / PR sans rien supprimer."
+            >
+              <span class="toggle-check" aria-hidden="true">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </span>
+              <span>Masquer habilitations &amp; Citizen/PR</span>
+              <span class="seg-count" id="count-whv-blocks">0</span>
+            </button>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label">Analyse</span>
+            <button type="button" class="toggle-btn" id="analysed-only-btn" aria-pressed="false">
+              <span class="toggle-check" aria-hidden="true">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </span>
+              <span>Analyses disponibles uniquement</span>
+              <span class="seg-count" id="count-analysed-filter">0</span>
+            </button>
+          </div>
         </div>
       </section>
 
@@ -1745,16 +1983,43 @@
       const API_SEARCH_URL = "/api/search/start";
       const API_START_URL = "/api/analysis/start";
       const API_STOP_URL = "/api/analysis/stop";
+      const API_TRIAGE_URL = "/api/triage";
+
+      const TRIAGE_STATUSES = [
+        { value: "todo", label: "À voir", badgeLabel: "", badgeClass: "" },
+        { value: "shortlist", label: "À postuler", badgeLabel: "À postuler", badgeClass: "badge-shortlist" },
+        { value: "applied", label: "Postulée", badgeLabel: "Postulée", badgeClass: "badge-applied" },
+        { value: "dismissed", label: "Écartée", badgeLabel: "Écartée", badgeClass: "badge-dismissed" }
+      ];
+      const VALID_TRIAGE_STATUSES = new Set(["todo", "shortlist", "applied", "dismissed"]);
+      const ROLE_FAMILIES = [
+        "Cloud & DevOps",
+        "Infrastructure",
+        "Support IT",
+        "IA complémentaire"
+      ];
+      const NO_EVIDENCE_RE = /^(?:non\s+pr[eé]cis[eé]|aucun\s+extrait\s+pertinent\s+rep[eé]r[eé]\s+automatiquement)$/i;
+      const CLEARANCE_FALLBACK_RE = /\b(?:nv1|nv2|pv|baseline|agsva|security\s+clearance|negative\s+vetting|positive\s+vetting|clearance)\b/i;
+      const NO_CLEARANCE_RE = /\bno\s+(?:security\s+)?clearance\s+(?:required|needed)\b/i;
+      const CITIZEN_PR_FALLBACK_RE = /\b(?:australian\s+citizen(?:ship)?|citizen(?:ship)?\s+(?:only|required|mandatory)|permanent\s+residen(?:t|cy)|pr\s+(?:only|required|holder)|full\s+working\s+rights|unrestricted\s+work(?:ing)?\s+rights|no\s+(?:visa\s+)?sponsor(?:ship)?|must\s+be\s+(?:an?\s+)?(?:australian\s+)?citizen)\b/i;
+      const EQUAL_OPP_CITIZENSHIP_RE = /\b(?:regardless\s+of|without\s+regard\s+to)\b[^.]{0,120}\bcitizenship\b/i;
+      const CONTRACT_WORK_TYPE_RE = /contract|temp|casual/i;
+      const FULLTIME_WORK_TYPE_RE = /full[\s-]*time/i;
 
       let activeFetchPromise = null;
       let profileSignature = "";
       let searchPreviewSignature = "";
       let searchClock = null;
+      let triageRequestSeq = 0;
 
       const state = {
         jobs: [],
         rawJobsCount: 0,
         analyses: Object.create(null),
+        triage: Object.create(null),
+        triageDrafts: Object.create(null),
+        triageFeedback: Object.create(null),
+        triagePending: Object.create(null),
         progress: {
           completed: 0,
           total: 0,
@@ -1768,9 +2033,14 @@
         searchTaskError: null,
         search: "",
         region: "all",
+        family: "all",
+        triageFilter: "all",
+        contract: "all",
+        hideWhvBlocks: false,
         analysedOnly: false,
         sort: "score",
         selectedId: null,
+        renderedDetailJobId: null,
         mobileDetailOpen: false,
         hasLoadedOnce: false,
         isFetching: false,
@@ -1829,6 +2099,19 @@
         countRegionAll: document.getElementById("count-region-all"),
         countRegionSydney: document.getElementById("count-region-sydney"),
         countRegionMelbourne: document.getElementById("count-region-melbourne"),
+        familySelect: document.getElementById("family-select"),
+        triageFilterBtns: Array.from(document.querySelectorAll("[data-triage-filter]")),
+        countTriageAll: document.getElementById("count-triage-all"),
+        countTriageTodo: document.getElementById("count-triage-todo"),
+        countTriageShortlist: document.getElementById("count-triage-shortlist"),
+        countTriageApplied: document.getElementById("count-triage-applied"),
+        countTriageDismissed: document.getElementById("count-triage-dismissed"),
+        contractBtns: Array.from(document.querySelectorAll("[data-contract]")),
+        countContractAll: document.getElementById("count-contract-all"),
+        countContractContract: document.getElementById("count-contract-contract"),
+        countContractFulltime: document.getElementById("count-contract-fulltime"),
+        hideWhvBlocksBtn: document.getElementById("hide-whv-blocks-btn"),
+        countWhvBlocks: document.getElementById("count-whv-blocks"),
         analysedOnlyBtn: document.getElementById("analysed-only-btn"),
         countAnalysedFilter: document.getElementById("count-analysed-filter"),
         sortSelect: document.getElementById("sort-select"),
@@ -1989,10 +2272,39 @@
         }
       }
 
+      function deriveWhvFlags(raw, preuveVisa, preuveHabilitation) {
+        if (raw && raw.whv_flags && typeof raw.whv_flags === "object") {
+          return {
+            clearance: Boolean(raw.whv_flags.clearance),
+            citizen_pr_risk: Boolean(raw.whv_flags.citizen_pr_risk),
+            visa_mention: Boolean(raw.whv_flags.visa_mention)
+          };
+        }
+        const habProof = NO_EVIDENCE_RE.test(preuveHabilitation) ? "" : preuveHabilitation;
+        const visaProof = NO_EVIDENCE_RE.test(preuveVisa) ? "" : preuveVisa;
+        const clearance = Boolean(
+          habProof &&
+          CLEARANCE_FALLBACK_RE.test(habProof) &&
+          !NO_CLEARANCE_RE.test(habProof)
+        );
+        const citizenPrRisk = Boolean(
+          visaProof &&
+          CITIZEN_PR_FALLBACK_RE.test(visaProof) &&
+          !EQUAL_OPP_CITIZENSHIP_RE.test(visaProof)
+        );
+        return {
+          clearance: clearance,
+          citizen_pr_risk: citizenPrRisk,
+          visa_mention: Boolean(visaProof)
+        };
+      }
+
       function normalizeAnalysis(raw) {
         if (!raw || typeof raw !== "object") return null;
         const rawScore = raw.score;
         const hasScore = !raw.score_obsolete && Number.isFinite(rawScore) && rawScore >= 0 && rawScore <= 100;
+        const preuveVisa = asText(raw.preuve_visa, "Non précisé");
+        const preuveHabilitation = asText(raw.preuve_habilitation, "Non précisé");
         return {
           score: hasScore ? Math.round(rawScore) : null,
           score_method: asText(raw.score_method, ""),
@@ -2013,10 +2325,48 @@
           experience: asText(raw.experience, "Non précisé"),
           preuve_experience: asText(raw.preuve_experience, "Non précisé"),
           visa_sponsoring: asText(raw.visa_sponsoring, "Non précisé"),
-          preuve_visa: asText(raw.preuve_visa, "Non précisé"),
+          preuve_visa: preuveVisa,
           habilitation: asText(raw.habilitation, "Non précisé"),
-          preuve_habilitation: asText(raw.preuve_habilitation, "Non précisé")
+          preuve_habilitation: preuveHabilitation,
+          whv_flags: deriveWhvFlags(raw, preuveVisa, preuveHabilitation)
         };
+      }
+
+      function normalizeTriageEntry(raw) {
+        if (!raw || typeof raw !== "object") return null;
+        const status = typeof raw.status === "string" && VALID_TRIAGE_STATUSES.has(raw.status) ? raw.status : "todo";
+        const note = typeof raw.note === "string" ? raw.note.slice(0, 500) : "";
+        const updatedAt = Number.isFinite(Number(raw.updated_at)) ? Number(raw.updated_at) : null;
+        if (status === "todo" && note.trim() === "") return null;
+        return { status: status, note: note, updated_at: updatedAt };
+      }
+
+      function getTriageForJob(jobOrId) {
+        const id = typeof jobOrId === "string" ? jobOrId : (jobOrId ? jobOrId.id : "");
+        if (id && Object.prototype.hasOwnProperty.call(state.triage, id) && state.triage[id]) {
+          return state.triage[id];
+        }
+        return { status: "todo", note: "", updated_at: null };
+      }
+
+      function getWhvFlags(analysis) {
+        if (!analysis || !analysis.whv_flags) {
+          return { clearance: false, citizen_pr_risk: false, visa_mention: false };
+        }
+        return analysis.whv_flags;
+      }
+
+      function hasWhvBlock(analysis) {
+        const flags = getWhvFlags(analysis);
+        return Boolean(flags.clearance || flags.citizen_pr_risk);
+      }
+
+      function isContractWorkType(workType) {
+        return CONTRACT_WORK_TYPE_RE.test(workType || "");
+      }
+
+      function isFullTimeWorkType(workType) {
+        return FULLTIME_WORK_TYPE_RE.test(workType || "");
       }
 
       function deduplicateJobs(rawJobs) {
@@ -2070,22 +2420,40 @@
         return true;
       }
 
-      function matchesSearch(job, analysis, query) {
+      function matchesFamily(job, family) {
+        if (family === "all") return true;
+        return job.role_category === family;
+      }
+
+      function matchesContract(job, contract) {
+        if (contract === "all") return true;
+        if (contract === "contract") return isContractWorkType(job.work_type);
+        if (contract === "fulltime") return isFullTimeWorkType(job.work_type);
+        return true;
+      }
+
+      function matchesSearch(job, analysis, triage, query) {
         if (!query) return true;
         const haystacks = [
           job.job_title,
           job.business_name,
+          job.role_category,
           job.area,
           job.work_type,
           job.pay_range,
           job.id
         ];
+        if (triage && triage.note) {
+          haystacks.push(triage.note);
+        }
         if (analysis) {
           haystacks.push(
             analysis.experience,
             analysis.preuve_experience,
             analysis.visa_sponsoring,
-            analysis.preuve_visa
+            analysis.preuve_visa,
+            analysis.habilitation,
+            analysis.preuve_habilitation
           );
           if (analysis.score !== null) {
             haystacks.push(analysis.resume, ...analysis.competences_reperees, ...analysis.competences_manquantes,
@@ -2102,10 +2470,15 @@
         for (let i = 0; i < state.jobs.length; i += 1) {
           const job = state.jobs[i];
           const analysis = getAnalysisForJob(job);
+          const triage = getTriageForJob(job);
           if (!matchesRegion(job, state.region)) continue;
-          if (state.analysedOnly && !analysis) continue;
-          if (!matchesSearch(job, analysis, query)) continue;
-          filtered.push({ job: job, analysis: analysis });
+          if (!matchesFamily(job, state.family)) continue;
+          if (state.triageFilter !== "all" && triage.status !== state.triageFilter) continue;
+          if (!matchesContract(job, state.contract)) continue;
+          if (state.hideWhvBlocks && hasWhvBlock(analysis)) continue;
+          if (state.analysedOnly && !(analysis && analysis.score !== null)) continue;
+          if (!matchesSearch(job, analysis, triage, query)) continue;
+          filtered.push({ job: job, analysis: analysis, triage: triage });
         }
 
         filtered.sort(function (a, b) {
@@ -2206,6 +2579,8 @@
           addEl("circle", { cx: "12", cy: "12", r: "10" });
           addEl("line", { x1: "12", y1: "8", x2: "12", y2: "12" });
           addEl("line", { x1: "12", y1: "16", x2: "12.01", y2: "16" });
+        } else if (kind === "shield") {
+          addEl("path", { d: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" });
         }
         return svg;
       }
@@ -2413,19 +2788,66 @@
         let sydney = 0;
         let melbourne = 0;
         let analysed = 0;
+        let whvBlocks = 0;
+        let contractCount = 0;
+        let fulltimeCount = 0;
+        const triageCounts = { todo: 0, shortlist: 0, applied: 0, dismissed: 0 };
+        const familyCounts = Object.create(null);
+        for (let f = 0; f < ROLE_FAMILIES.length; f += 1) {
+          familyCounts[ROLE_FAMILIES[f]] = 0;
+        }
+
         for (let i = 0; i < state.jobs.length; i += 1) {
           const job = state.jobs[i];
+          const analysis = getAnalysisForJob(job);
+          const triage = getTriageForJob(job);
           if (matchesRegion(job, "sydney")) sydney += 1;
           if (matchesRegion(job, "melbourne")) melbourne += 1;
-          if (getAnalysisForJob(job)) analysed += 1;
+          if (analysis && analysis.score !== null) analysed += 1;
+          if (hasWhvBlock(analysis)) whvBlocks += 1;
+          if (isContractWorkType(job.work_type)) contractCount += 1;
+          if (isFullTimeWorkType(job.work_type)) fulltimeCount += 1;
+          if (Object.prototype.hasOwnProperty.call(triageCounts, triage.status)) {
+            triageCounts[triage.status] += 1;
+          }
+          if (Object.prototype.hasOwnProperty.call(familyCounts, job.role_category)) {
+            familyCounts[job.role_category] += 1;
+          }
         }
+
         els.countRegionAll.textContent = String(state.jobs.length);
         els.countRegionSydney.textContent = String(sydney);
         els.countRegionMelbourne.textContent = String(melbourne);
+        els.countTriageAll.textContent = String(state.jobs.length);
+        els.countTriageTodo.textContent = String(triageCounts.todo);
+        els.countTriageShortlist.textContent = String(triageCounts.shortlist);
+        els.countTriageApplied.textContent = String(triageCounts.applied);
+        els.countTriageDismissed.textContent = String(triageCounts.dismissed);
+        els.countContractAll.textContent = String(state.jobs.length);
+        els.countContractContract.textContent = String(contractCount);
+        els.countContractFulltime.textContent = String(fulltimeCount);
+        els.countWhvBlocks.textContent = String(whvBlocks);
         els.countAnalysedFilter.textContent = String(analysed);
 
+        const familyOptions = els.familySelect.options;
+        for (let o = 0; o < familyOptions.length; o += 1) {
+          const opt = familyOptions[o];
+          if (opt.value === "all") {
+            opt.textContent = "Toutes les familles (" + state.jobs.length + ")";
+          } else if (Object.prototype.hasOwnProperty.call(familyCounts, opt.value)) {
+            opt.textContent = opt.value + " (" + familyCounts[opt.value] + ")";
+          }
+        }
+
         els.clearSearchBtn.hidden = state.search.length === 0;
-        const hasActiveFilters = state.search.trim().length > 0 || state.region !== "all" || state.analysedOnly;
+        const hasActiveFilters =
+          state.search.trim().length > 0 ||
+          state.region !== "all" ||
+          state.family !== "all" ||
+          state.triageFilter !== "all" ||
+          state.contract !== "all" ||
+          state.hideWhvBlocks ||
+          state.analysedOnly;
         els.resetFiltersBtn.hidden = !hasActiveFilters;
       }
 
@@ -2503,7 +2925,7 @@
           els.listContainer.appendChild(
             createStateBox(
               "Aucune offre ne correspond à vos filtres",
-              "Essayez d'élargir la zone géographique, de désactiver le filtre « Analysées uniquement » ou de modifier votre recherche.",
+              "Essayez d'élargir vos filtres (suivi, zone, famille, contrat ou WHV 417) ou de modifier votre recherche.",
               "Réinitialiser les filtres",
               resetFilters
             )
@@ -2518,6 +2940,9 @@
           const entry = entries[i];
           const job = entry.job;
           const analysis = entry.analysis;
+          const triage = entry.triage || getTriageForJob(job);
+          const whvFlags = getWhvFlags(analysis);
+          const isContract = isContractWorkType(job.work_type);
           const isSelected = state.selectedId === job.id;
 
           const li = document.createElement("li");
@@ -2562,6 +2987,62 @@
           companyEl.textContent = job.business_name;
           btn.appendChild(companyEl);
 
+          const badgesRow = document.createElement("div");
+          badgesRow.className = "job-badges-row";
+
+          if (job.role_category && job.role_category !== "Famille non classée" && job.role_category !== "Hors cible") {
+            const famPill = document.createElement("span");
+            famPill.className = "job-badge badge-family";
+            famPill.textContent = job.role_category;
+            badgesRow.appendChild(famPill);
+          }
+
+          if (isContract) {
+            const contractPill = document.createElement("span");
+            contractPill.className = "job-badge badge-contract";
+            contractPill.textContent = "Contract/Temp";
+            contractPill.title = "Contrat court ou temporaire, adapté à la limite de 6 mois du WHV 417";
+            badgesRow.appendChild(contractPill);
+          }
+
+          if (whvFlags.clearance) {
+            const clearancePill = document.createElement("span");
+            clearancePill.className = "job-badge badge-danger";
+            clearancePill.appendChild(createSvgIcon("shield"));
+            const clearanceTxt = document.createElement("span");
+            clearanceTxt.textContent = "Habilitation";
+            clearancePill.appendChild(clearanceTxt);
+            clearancePill.title = "Habilitation de sécurité mentionnée dans l'annonce";
+            badgesRow.appendChild(clearancePill);
+          }
+
+          if (whvFlags.citizen_pr_risk) {
+            const citizenPill = document.createElement("span");
+            citizenPill.className = "job-badge badge-warning";
+            citizenPill.appendChild(createSvgIcon("alert"));
+            const citizenTxt = document.createElement("span");
+            citizenTxt.textContent = "Citizen / PR";
+            citizenPill.appendChild(citizenTxt);
+            citizenPill.title = "Restriction citoyenneté australienne, résidence permanente ou droits de travail complets repérée";
+            badgesRow.appendChild(citizenPill);
+          }
+
+          if (triage.status !== "todo") {
+            for (let t = 0; t < TRIAGE_STATUSES.length; t += 1) {
+              if (TRIAGE_STATUSES[t].value === triage.status && TRIAGE_STATUSES[t].badgeLabel) {
+                const triagePill = document.createElement("span");
+                triagePill.className = "job-badge " + TRIAGE_STATUSES[t].badgeClass;
+                triagePill.textContent = TRIAGE_STATUSES[t].badgeLabel;
+                badgesRow.appendChild(triagePill);
+                break;
+              }
+            }
+          }
+
+          if (badgesRow.childNodes.length > 0) {
+            btn.appendChild(badgesRow);
+          }
+
           const metaRow = document.createElement("div");
           metaRow.className = "job-meta-row";
 
@@ -2582,7 +3063,7 @@
           areaChip.appendChild(areaTxt);
           metaRow.appendChild(areaChip);
 
-          if (job.work_type) {
+          if (job.work_type && !(isContract && job.work_type.toLowerCase() === "contract/temp")) {
             const wtChip = document.createElement("span");
             wtChip.className = "meta-chip";
             wtChip.textContent = job.work_type;
@@ -2629,6 +3110,156 @@
         }
       }
 
+      function isNoteInputFocused() {
+        const active = document.activeElement;
+        return Boolean(active && active.id === "triage-note-input" && els.detailPanel.contains(active));
+      }
+
+      function syncTriageControlsInPlace(jobId) {
+        if (state.renderedDetailJobId !== jobId) return;
+        const triage = getTriageForJob(jobId);
+        const statusBtns = els.detailPanel.querySelectorAll("[data-triage-status]");
+        for (let i = 0; i < statusBtns.length; i += 1) {
+          statusBtns[i].setAttribute(
+            "aria-pressed",
+            statusBtns[i].dataset.triageStatus === triage.status ? "true" : "false"
+          );
+        }
+        const feedbackEl = document.getElementById("triage-feedback");
+        if (feedbackEl && els.detailPanel.contains(feedbackEl)) {
+          const fb = state.triageFeedback[jobId] || null;
+          feedbackEl.className = "triage-feedback" + (fb && fb.tone ? " " + fb.tone : "");
+          feedbackEl.textContent = fb ? fb.text : "";
+        }
+        const noteEl = document.getElementById("triage-note-input");
+        if (
+          noteEl &&
+          els.detailPanel.contains(noteEl) &&
+          document.activeElement !== noteEl &&
+          !Object.prototype.hasOwnProperty.call(state.triageDrafts, jobId) &&
+          noteEl.value !== triage.note
+        ) {
+          noteEl.value = triage.note;
+        }
+      }
+
+      async function saveTriage(jobId, nextStatus, rawNote, fromStatusClick) {
+        const safeStatus = VALID_TRIAGE_STATUSES.has(nextStatus) ? nextStatus : "todo";
+        const note = typeof rawNote === "string" ? rawNote.slice(0, 500) : "";
+        const previousTriage = Object.prototype.hasOwnProperty.call(state.triage, jobId)
+          ? state.triage[jobId]
+          : null;
+        const previousSelectedId = state.selectedId;
+
+        let prevIndex = -1;
+        if (fromStatusClick && state.triageFilter !== "all") {
+          const beforeEntries = getFilteredAndSortedJobs();
+          for (let i = 0; i < beforeEntries.length; i += 1) {
+            if (beforeEntries[i].job.id === jobId) {
+              prevIndex = i;
+              break;
+            }
+          }
+        }
+
+        triageRequestSeq += 1;
+        const seq = triageRequestSeq;
+        state.triagePending[jobId] = seq;
+
+        const optimistic = normalizeTriageEntry({
+          status: safeStatus,
+          note: note,
+          updated_at: Date.now() / 1000
+        });
+        if (optimistic) {
+          state.triage[jobId] = optimistic;
+        } else {
+          delete state.triage[jobId];
+        }
+        state.triageFeedback[jobId] = { text: "Enregistrement…", tone: "", seq: seq };
+
+        if (prevIndex >= 0) {
+          const afterEntries = getFilteredAndSortedJobs();
+          const stillVisible = afterEntries.some(function (e) { return e.job.id === jobId; });
+          if (!stillVisible) {
+            state.selectedId = afterEntries.length > 0
+              ? afterEntries[Math.min(prevIndex, afterEntries.length - 1)].job.id
+              : null;
+          }
+        }
+
+        renderAll();
+
+        try {
+          const response = await fetch(API_TRIAGE_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Accept": "application/json"
+            },
+            body: JSON.stringify({ job_id: jobId, status: safeStatus, note: note }),
+            cache: "no-store"
+          });
+
+          let payload = null;
+          try {
+            payload = await response.json();
+          } catch (_parseErr) {
+            payload = null;
+          }
+
+          const apiError = payload && typeof payload === "object" ? asText(payload.error, "") : "";
+          if (!response.ok || apiError) {
+            throw new Error(apiError || ("Erreur HTTP " + response.status + " lors de l'enregistrement."));
+          }
+
+          if (state.triagePending[jobId] !== seq) return;
+          delete state.triagePending[jobId];
+
+          const saved = payload && Object.prototype.hasOwnProperty.call(payload, "triage")
+            ? normalizeTriageEntry(payload.triage)
+            : optimistic;
+          if (saved) {
+            state.triage[jobId] = saved;
+          } else {
+            delete state.triage[jobId];
+          }
+          if (Object.prototype.hasOwnProperty.call(state.triageDrafts, jobId) && state.triageDrafts[jobId] === note) {
+            delete state.triageDrafts[jobId];
+          }
+
+          state.triageFeedback[jobId] = { text: "Enregistrée", tone: "is-saved", seq: seq };
+          renderAll();
+
+          window.setTimeout(function () {
+            if (state.triageFeedback[jobId] && state.triageFeedback[jobId].seq === seq) {
+              delete state.triageFeedback[jobId];
+              if (state.renderedDetailJobId === jobId) {
+                syncTriageControlsInPlace(jobId);
+              }
+            }
+          }, 2500);
+        } catch (err) {
+          if (state.triagePending[jobId] !== seq) return;
+          delete state.triagePending[jobId];
+
+          if (previousTriage) {
+            state.triage[jobId] = previousTriage;
+          } else {
+            delete state.triage[jobId];
+          }
+          if (!Object.prototype.hasOwnProperty.call(state.triageDrafts, jobId)) {
+            state.triageDrafts[jobId] = note;
+          }
+          if (fromStatusClick && previousSelectedId === jobId) {
+            state.selectedId = jobId;
+          }
+          const reason = err && err.message ? err.message : "Enregistrement impossible.";
+          state.triageFeedback[jobId] = { text: reason, tone: "is-error", seq: seq };
+          renderAll();
+        }
+      }
+
       function buildDetailSignature(selectedEntry) {
         if (!selectedEntry) {
           return "empty:" + (state.jobs.length === 0 ? "0" : "filtered");
@@ -2659,11 +3290,21 @@
 
         els.workspace.classList.toggle("mobile-detail-open", Boolean(selectedEntry) && state.mobileDetailOpen);
 
+        // Preserve focus and unsaved draft when polling fires while editing the note.
+        if (selectedEntry && state.renderedDetailJobId === selectedEntry.job.id && isNoteInputFocused()) {
+          syncTriageControlsInPlace(selectedEntry.job.id);
+          return;
+        }
+
         const nextSig = buildDetailSignature(selectedEntry);
         if (nextSig === state.lastDetailSignature) {
+          if (selectedEntry && state.renderedDetailJobId === selectedEntry.job.id) {
+            syncTriageControlsInPlace(selectedEntry.job.id);
+          }
           return;
         }
         state.lastDetailSignature = nextSig;
+        state.renderedDetailJobId = selectedEntry ? selectedEntry.job.id : null;
 
         els.detailPanel.textContent = "";
 
@@ -2690,6 +3331,7 @@
 
         const job = selectedEntry.job;
         const analysis = selectedEntry.analysis;
+        const triage = getTriageForJob(job.id);
 
         const backRow = document.createElement("div");
         backRow.className = "mobile-back-row";
@@ -2769,6 +3411,99 @@
         }
 
         head.appendChild(actions);
+
+        const triageBox = document.createElement("div");
+        triageBox.className = "triage-box";
+
+        const triageHead = document.createElement("div");
+        triageHead.className = "triage-head";
+        const triageLabel = document.createElement("span");
+        triageLabel.className = "control-label";
+        triageLabel.id = "triage-status-label";
+        triageLabel.textContent = "Suivi de candidature";
+        const triageFeedback = document.createElement("span");
+        triageFeedback.id = "triage-feedback";
+        triageFeedback.setAttribute("aria-live", "polite");
+        const activeFb = state.triageFeedback[job.id] || null;
+        triageFeedback.className = "triage-feedback" + (activeFb && activeFb.tone ? " " + activeFb.tone : "");
+        triageFeedback.textContent = activeFb ? activeFb.text : "";
+        triageHead.appendChild(triageLabel);
+        triageHead.appendChild(triageFeedback);
+        triageBox.appendChild(triageHead);
+
+        const triageSeg = document.createElement("div");
+        triageSeg.className = "segmented-group triage-segmented";
+        triageSeg.setAttribute("role", "group");
+        triageSeg.setAttribute("aria-labelledby", "triage-status-label");
+
+        for (let t = 0; t < TRIAGE_STATUSES.length; t += 1) {
+          const statusDef = TRIAGE_STATUSES[t];
+          const sBtn = document.createElement("button");
+          sBtn.type = "button";
+          sBtn.className = "seg-btn";
+          sBtn.dataset.triageStatus = statusDef.value;
+          sBtn.setAttribute("aria-pressed", triage.status === statusDef.value ? "true" : "false");
+          sBtn.textContent = statusDef.label;
+          sBtn.addEventListener("click", function () {
+            const currentNote = Object.prototype.hasOwnProperty.call(state.triageDrafts, job.id)
+              ? state.triageDrafts[job.id]
+              : getTriageForJob(job.id).note;
+            saveTriage(job.id, statusDef.value, currentNote, true);
+          });
+          triageSeg.appendChild(sBtn);
+        }
+        triageBox.appendChild(triageSeg);
+
+        const noteRow = document.createElement("div");
+        noteRow.className = "triage-note-row";
+
+        const noteLabel = document.createElement("label");
+        noteLabel.className = "sr-only";
+        noteLabel.htmlFor = "triage-note-input";
+        noteLabel.textContent = "Note personnelle";
+        noteRow.appendChild(noteLabel);
+
+        const noteInput = document.createElement("textarea");
+        noteInput.id = "triage-note-input";
+        noteInput.className = "text-input triage-note-input";
+        noteInput.rows = 2;
+        noteInput.maxLength = 500;
+        noteInput.placeholder = "Note personnelle (contact, date, salaire, point WHV…)";
+        noteInput.value = Object.prototype.hasOwnProperty.call(state.triageDrafts, job.id)
+          ? state.triageDrafts[job.id]
+          : triage.note;
+        noteInput.addEventListener("input", function () {
+          const serverNote = getTriageForJob(job.id).note;
+          if (noteInput.value === serverNote) {
+            delete state.triageDrafts[job.id];
+          } else {
+            state.triageDrafts[job.id] = noteInput.value;
+          }
+          if (state.triageFeedback[job.id] && state.triageFeedback[job.id].tone === "is-saved") {
+            delete state.triageFeedback[job.id];
+            syncTriageControlsInPlace(job.id);
+          }
+        });
+        noteInput.addEventListener("keydown", function (event) {
+          if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+            event.preventDefault();
+            saveTriage(job.id, getTriageForJob(job.id).status, noteInput.value, false);
+          }
+        });
+        noteRow.appendChild(noteInput);
+
+        const saveBtn = document.createElement("button");
+        saveBtn.type = "button";
+        saveBtn.id = "triage-save-btn";
+        saveBtn.className = "btn triage-save-btn";
+        saveBtn.textContent = "Enregistrer";
+        saveBtn.addEventListener("click", function () {
+          saveTriage(job.id, getTriageForJob(job.id).status, noteInput.value, false);
+        });
+        noteRow.appendChild(saveBtn);
+
+        triageBox.appendChild(noteRow);
+        head.appendChild(triageBox);
         els.detailPanel.appendChild(head);
 
         if (!analysis) {
@@ -3000,11 +3735,23 @@
       function resetFilters() {
         state.search = "";
         state.region = "all";
+        state.family = "all";
+        state.triageFilter = "all";
+        state.contract = "all";
+        state.hideWhvBlocks = false;
         state.analysedOnly = false;
         els.searchInput.value = "";
+        els.familySelect.value = "all";
+        els.hideWhvBlocksBtn.setAttribute("aria-pressed", "false");
         els.analysedOnlyBtn.setAttribute("aria-pressed", "false");
         for (let i = 0; i < els.regionBtns.length; i += 1) {
           els.regionBtns[i].setAttribute("aria-pressed", els.regionBtns[i].dataset.region === "all" ? "true" : "false");
+        }
+        for (let i = 0; i < els.triageFilterBtns.length; i += 1) {
+          els.triageFilterBtns[i].setAttribute("aria-pressed", els.triageFilterBtns[i].dataset.triageFilter === "all" ? "true" : "false");
+        }
+        for (let i = 0; i < els.contractBtns.length; i += 1) {
+          els.contractBtns[i].setAttribute("aria-pressed", els.contractBtns[i].dataset.contract === "all" ? "true" : "false");
         }
         renderAll();
         els.searchInput.focus();
@@ -3032,6 +3779,30 @@
           }
         }
         state.analyses = nextAnalyses;
+
+        if (payload.triage && typeof payload.triage === "object" && !Array.isArray(payload.triage)) {
+          const nextTriage = Object.create(null);
+          const tKeys = Object.keys(payload.triage);
+          for (let i = 0; i < tKeys.length; i += 1) {
+            const key = String(tKeys[i]).trim();
+            if (!key) continue;
+            const normalizedTriage = normalizeTriageEntry(payload.triage[tKeys[i]]);
+            if (normalizedTriage) {
+              nextTriage[key] = normalizedTriage;
+            }
+          }
+          // Keep optimistic entries for any job with an in-flight POST /api/triage request.
+          const pendingKeys = Object.keys(state.triagePending);
+          for (let i = 0; i < pendingKeys.length; i += 1) {
+            const pKey = pendingKeys[i];
+            if (Object.prototype.hasOwnProperty.call(state.triage, pKey) && state.triage[pKey]) {
+              nextTriage[pKey] = state.triage[pKey];
+            } else {
+              delete nextTriage[pKey];
+            }
+          }
+          state.triage = nextTriage;
+        }
         renderProfile(payload.profile);
 
         const prog = payload.progress && typeof payload.progress === "object" ? payload.progress : {};
@@ -3222,6 +3993,47 @@
           renderAll();
         });
       }
+
+      els.familySelect.addEventListener("change", function (event) {
+        state.family = event.target.value || "all";
+        renderAll();
+      });
+
+      for (let i = 0; i < els.triageFilterBtns.length; i += 1) {
+        els.triageFilterBtns[i].addEventListener("click", function (event) {
+          const btn = event.currentTarget;
+          const nextTriage = btn.dataset.triageFilter || "all";
+          state.triageFilter = nextTriage;
+          for (let j = 0; j < els.triageFilterBtns.length; j += 1) {
+            els.triageFilterBtns[j].setAttribute(
+              "aria-pressed",
+              els.triageFilterBtns[j].dataset.triageFilter === nextTriage ? "true" : "false"
+            );
+          }
+          renderAll();
+        });
+      }
+
+      for (let i = 0; i < els.contractBtns.length; i += 1) {
+        els.contractBtns[i].addEventListener("click", function (event) {
+          const btn = event.currentTarget;
+          const nextContract = btn.dataset.contract || "all";
+          state.contract = nextContract;
+          for (let j = 0; j < els.contractBtns.length; j += 1) {
+            els.contractBtns[j].setAttribute(
+              "aria-pressed",
+              els.contractBtns[j].dataset.contract === nextContract ? "true" : "false"
+            );
+          }
+          renderAll();
+        });
+      }
+
+      els.hideWhvBlocksBtn.addEventListener("click", function () {
+        state.hideWhvBlocks = !state.hideWhvBlocks;
+        els.hideWhvBlocksBtn.setAttribute("aria-pressed", state.hideWhvBlocks ? "true" : "false");
+        renderAll();
+      });
 
       els.analysedOnlyBtn.addEventListener("click", function () {
         state.analysedOnly = !state.analysedOnly;

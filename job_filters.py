@@ -1,7 +1,7 @@
 """Shared filters for job search results."""
 import re
 
-SCORE_VERSION = "cv-rules-v2"
+SCORE_VERSION = "cv-rules-v3"
 
 ROLE_PATTERNS = {
     "IA complémentaire": re.compile(r"\b(?:junior\s+)?ai\s+(?:engineer|infrastructure|platform)\b|\b(?:mlops|llmops|genai|generative\s+ai|machine\s+learning\s+ops)\b", re.I),
@@ -9,7 +9,22 @@ ROLE_PATTERNS = {
     "Infrastructure": re.compile(r"\binfrastructure\b|\bsystems?\s+(?:engineer|administrator)\b|\blinux\s+system\s+administrator\b|\bict\s+systems?\s+administrator\b|\bit\s+operations\b|\bproduction\s+support\b|\bapplication\s+support\b", re.I),
     "Support IT": re.compile(r"\b(?:technical|it|level\s*[23]|ict|noc|desktop|service\s+desk|data\s+center|field\s+services?)\s+(?:support|engineer|analyst|officer|technician)\b|\b(?:noc|msp)\s+(?:engineer|analyst|systems?\s+engineer)\b", re.I),
 }
-PRIORITY_ROLE = re.compile(r"\b(?:cloud\s+support\s+engineer|cloud\s+operations\s+engineer|junior\s+devops\s+engineer|infrastructure\s+engineer)\b", re.I)
+PRIORITY_ROLE = re.compile(
+    r"\b(?:(?:aws\s+)?cloud\s+engineer|junior\s+devops\s+engineer|site\s+reliability\s+engineer|sre|cloud\s+support\s+(?:engineer|associate)|cloud\s+operations\s+engineer)\b",
+    re.I,
+)
+WHV_RESTRICTIVE_VISA = re.compile(
+    r"\b(?:citizen(?:s|ship)?|permanent\s+residen(?:ts?|cy)|pr\s+only|"
+    r"no\s+(?:visa\s+)?sponsor(?:ship|ing)?|"
+    r"unable\s+to\s+(?:provide\s+|offer\s+)?(?:visa\s+)?sponsor(?:ship)?|"
+    r"not\s+(?:able|eligible)\s+to\s+sponsor|"
+    r"cannot\s+(?:provide\s+|offer\s+)?(?:visa\s+)?sponsor(?:ship)?|"
+    r"do(?:es)?\s+not\s+(?:provide\s+|offer\s+)?(?:visa\s+)?sponsor(?:ship)?|"
+    r"don['’]t\s+sponsor|"
+    r"(?:full|unrestricted|unlimited)\s+(?:australian\s+)?work(?:ing)?\s+rights?|"
+    r"no\s+(?:whv|working\s+holiday))\b",
+    re.I,
+)
 
 
 def role_category(job):
@@ -101,3 +116,26 @@ def experience_evidence(text):
 def experience_exclusion(text):
     """Return a literal excerpt only for a clear minimum of five years or more."""
     return next((quote for _, quote in experience_mentions(text, min_years=5, required_only=True)), None)
+
+
+def _has_excerpt(value):
+    if not isinstance(value, str):
+        return False
+    text = value.strip()
+    if not text:
+        return False
+    lowered = text.lower()
+    return lowered != "non précisé" and not lowered.startswith("aucun extrait")
+
+
+def whv_flags(analysis):
+    """Return deterministic WHV and clearance risk flags from extracted excerpts."""
+    analysis = analysis or {}
+    visa = analysis.get("preuve_visa")
+    clearance = analysis.get("preuve_habilitation")
+    has_visa = _has_excerpt(visa)
+    return {
+        "clearance": _has_excerpt(clearance),
+        "citizen_pr_risk": bool(has_visa and WHV_RESTRICTIVE_VISA.search(visa)),
+        "visa_mention": has_visa,
+    }
