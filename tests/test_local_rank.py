@@ -1,7 +1,7 @@
 import importlib.util
 import json
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 from urllib.parse import parse_qs, urlparse
 
 spec = importlib.util.spec_from_file_location("local_rank", Path(__file__).resolve().parents[1] / "local_rank.py")
@@ -35,10 +35,11 @@ def test_role_families_are_prioritized_and_noise_is_removed(tmp_path):
 
 def test_senior_title_variants_exclude_without_hiding_junior_titles():
     for title in ("Principal Cloud Engineer", "Staff DevOps Engineer", "Lead SRE", "IT Operations Manager",
-                  "AI Engineers & Engineering Leads", "Operations Support Mgr / IT Support Analyst"):
-        assert rank.is_senior({"job_title": title})
+                  "AI Engineers & Engineering Leads", "Operations Support Mgr / IT Support Analyst",
+                  "EL1 DevOps Engineer", "Cloud Architect"):
+        assert rank.is_senior({"job_title": title}), title
     for title in ("Junior Cloud Architect", "Level 3 Support Engineer", "Cloud Engineer", "IT Leadership Analyst"):
-        assert not rank.is_senior({"job_title": title})
+        assert not rank.is_senior({"job_title": title}), title
 
 
 def test_fit_score_is_deterministic_and_rewards_profile_skill_overlap():
@@ -69,32 +70,41 @@ def test_whv_flags_detects_clearance_restrictions_and_placeholders():
     assert job_filters.whv_flags({
         "preuve_habilitation": "NV1 security clearance is required.",
         "preuve_visa": "Aucun extrait repéré",
-    }) == {"clearance": True, "citizen_pr_risk": False, "visa_mention": False}
+    }) == {"clearance": True, "citizen_pr_risk": False, "visa_mention": False, "no_sponsorship": False}
 
     for excerpt in (
         "Only Australian citizens are eligible.",
         "Australian permanent residents may apply.",
         "PR only for this role.",
-        "No visa sponsorship is available.",
-        "Unable to provide visa sponsorship.",
         "Applicants must have full working rights in Australia.",
         "No WHV candidates.",
     ):
         assert job_filters.whv_flags({"preuve_visa": excerpt}) == {
-            "clearance": False, "citizen_pr_risk": True, "visa_mention": True
+            "clearance": False, "citizen_pr_risk": True, "visa_mention": True, "no_sponsorship": False,
+        }, excerpt
+
+    for excerpt in (
+        "No visa sponsorship is available.",
+        "Unable to provide visa sponsorship.",
+        "Sponsorship is not available for this role.",
+    ):
+        assert job_filters.whv_flags({"preuve_visa": excerpt}) == {
+            "clearance": False, "citizen_pr_risk": False, "visa_mention": True, "no_sponsorship": True,
         }, excerpt
 
     assert job_filters.whv_flags({
         "preuve_visa": "Visa sponsorship is available for eligible applicants.",
         "preuve_habilitation": "Non précisé",
-    }) == {"clearance": False, "citizen_pr_risk": False, "visa_mention": True}
+    }) == {"clearance": False, "citizen_pr_risk": False, "visa_mention": True, "no_sponsorship": False}
 
     for placeholder in (None, "", "   ", "non précisé", "Non précisé", "Aucun extrait repéré", "aucun extrait trouvé"):
         assert job_filters.whv_flags({
             "preuve_visa": placeholder,
             "preuve_habilitation": placeholder,
-        }) == {"clearance": False, "citizen_pr_risk": False, "visa_mention": False}, placeholder
-    assert job_filters.whv_flags(None) == {"clearance": False, "citizen_pr_risk": False, "visa_mention": False}
+        }) == {"clearance": False, "citizen_pr_risk": False, "visa_mention": False, "no_sponsorship": False}, placeholder
+    assert job_filters.whv_flags(None) == {
+        "clearance": False, "citizen_pr_risk": False, "visa_mention": False, "no_sponsorship": False,
+    }
 
 
 def test_fit_uses_offer_skills_and_target_experience():
@@ -318,7 +328,7 @@ def test_resume_preserves_existing_and_skips_it(tmp_path):
          patch.object(rank.time, 'sleep'):
         rank.main()
         rank.main()
-    fetch.assert_called_once_with('2')
+    fetch.assert_called_once_with('2', session=ANY)
     model.assert_called_once()
     assert model.call_args.args[0]["job_id"] == "2"
     data = json.loads(report.with_suffix('.json').read_text(encoding='utf-8'))
@@ -333,7 +343,7 @@ def test_exclusion_survives_resume_without_calling_model(tmp_path):
          patch.object(rank, 'analyze') as analyze, patch.object(rank.time, 'sleep'):
         rank.main()
         rank.main()
-    fetch.assert_called_once_with('10')
+    fetch.assert_called_once_with('10', session=ANY)
     analyze.assert_not_called()
     data = json.loads(report.with_suffix('.json').read_text(encoding='utf-8'))
     assert len(data['exclusions']) == 1 and data['exclusions'][0]['job']['job_id'] == '10'
@@ -374,7 +384,7 @@ def test_analysis_after_search_only_processes_added_job_ids(tmp_path):
          patch.object(rank.fetcher, "fetch_job_detail", return_value=("<p>AWS</p>", None, "success")) as fetch, \
          patch.object(rank, "analyze", return_value=analysis) as model, patch.object(rank.time, "sleep"):
         rank.main()
-    fetch.assert_called_once_with("5")
+    fetch.assert_called_once_with("5", session=ANY)
     model.assert_called_once()
     data = json.loads(report.with_suffix(".json").read_text())
     assert [row["offre"]["job_id"] for row in data["analyses"]] == ["5"]
@@ -522,3 +532,159 @@ def test_local_rank_uses_inline_description_for_indeed_without_seek_fetch(tmp_pa
     data = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))
     assert "description" not in data["analyses"][0]["offre"]
     assert "AWS" in data["analyses"][0]["description"]
+
+
+def test_normalized_dedup_key_strips_company_suffixes_and_title_qualifiers():
+    assert job_filters.normalized_dedup_key("Cloud Engineer", "AC3") == job_filters.normalized_dedup_key("Cloud Engineer", "AC3 Pty Limited")
+    assert job_filters.normalized_dedup_key("Cloud Engineer - Hybrid", "iSelect Ltd") == job_filters.normalized_dedup_key("Cloud Engineer", "iSelect")
+    assert job_filters.normalized_dedup_key("Systems Engineer", "Leidos Defence Australia") == job_filters.normalized_dedup_key("Systems Engineer", "Leidos")
+    assert job_filters.normalized_dedup_key("DevOps Engineer (Sydney)", "Versent Group Pty Ltd") == job_filters.normalized_dedup_key("DevOps Engineer", "Versent")
+
+
+def test_contract_duration_work_mode_and_recruiter_contacts():
+    short = job_filters.contract_duration("Initial 6 months contract with possible extension.")
+    assert short["months_min"] == 6 and short["months_max"] == 6 and short["whv_fit"] == "ideal"
+    long_c = job_filters.contract_duration("12 month fixed-term contract based in Sydney.")
+    assert long_c["months_min"] == 12 and long_c["whv_fit"] == "long"
+    assert job_filters.contract_duration("We offer 16 weeks paid parental leave.")["whv_fit"] == "unknown"
+
+    assert job_filters.work_mode("This is a 100% remote role across Australia.") == "remote"
+    assert job_filters.work_mode("Flexible hybrid working arrangement, 2 days in office.") == "hybrid"
+    assert job_filters.work_mode("This is a full-time on-site role in our Sydney office.") == "onsite"
+    assert job_filters.work_mode("Manage hybrid cloud infrastructure on AWS.") == ""
+
+    contacts = job_filters.recruiter_contacts(
+        "Contact jane.doe@talenza.com.au or call 0412 345 678 (no-reply@seek.com.au ignored)."
+    )
+    assert contacts["emails"] == ["jane.doe@talenza.com.au"]
+    assert contacts["phones"] == ["0412 345 678"]
+
+
+def test_role_patterns_recover_target_titles_and_reject_off_target():
+    for title in (
+        "Linux Engineer",
+        "Data Centre Technician",
+        "Helpdesk Support Analyst",
+        "Level 2 & 3 - Support",
+        "Platforms Engineer",
+        "AI & Automation Engineer",
+    ):
+        assert job_filters.is_target_role({"job_title": title}), title
+    for title in (
+        "Adobe Experience Platform Engineer",
+        "Graduate Cloud Engineer - 2027 Start",
+    ):
+        assert not job_filters.is_target_role({"job_title": title}), title
+    assert job_filters.is_senior({"job_title": "EL1 DevOps Engineer"})
+    assert job_filters.is_senior({"job_title": "Cloud Architect"})
+    assert not job_filters.is_senior({"job_title": "Junior Cloud Architect"})
+
+
+def test_extract_evidence_prioritizes_work_rights_ignores_eeo_and_matches_clearances():
+    iselect = "Applicants must hold unlimited Australian working rights only. Sponsorship is not available."
+    assert "unlimited Australian working rights" in rank.extract_evidence(iselect, rank.VISA_TERMS)
+    assert rank.extract_evidence("Hiring decisions are never based on race, religion, or citizenship.", rank.VISA_TERMS) is None
+    assert rank.extract_evidence("The company may obtain nationality or citizenship information for export control.", rank.VISA_TERMS) is None
+    for text in ("DISP clearance required.", "Must hold AusCheck.", "Negative Vetting 1 required.", "NV-1 clearance mandatory."):
+        assert rank.extract_evidence(text, rank.CLEARANCE_TERMS), text
+
+
+def test_unsafe_model_terms_blocks_clearance_paris_and_sanitizes_notes():
+    result = rank.attach_source_evidence({
+        "resume": "Habilitation sécurité nationale requise",
+        "points_forts": [
+            "Expérience basée à Paris et Bois-Colombes",
+            "Bonne maîtrise AWS\net Terraform " + "x" * 300,
+        ],
+        "points_a_verifier": [
+            "Exige sécurité nationale",
+            "Prévoir un déménagement depuis Paris",
+            "Connaissance Kubernetes",
+        ],
+    }, "Initial 6 months contract. Hybrid role. Contact tech@acme.com.au")
+    assert "sécurité nationale" not in result["resume"]
+    assert len(result["points_forts"]) == 1
+    assert "\n" not in result["points_forts"][0] and len(result["points_forts"][0]) == 280
+    assert result["points_a_verifier"] == ["Connaissance Kubernetes"]
+    assert result["contract_duration"]["whv_fit"] == "ideal"
+    assert result["work_mode"] == "hybrid"
+    assert result["recruiter_contacts"]["emails"] == ["tech@acme.com.au"]
+
+
+def test_terminal_failure_not_retried_and_prune_orphans_cleans_archive(tmp_path):
+    jobs, report = tmp_path / "jobs.jsonl", tmp_path / "report.md"
+    live_job = {"job_id": "1", "job_title": "Cloud Engineer"}
+    expired_job = {"job_id": "2", "job_title": "DevOps Engineer"}
+    jobs.write_text("\n".join(map(json.dumps, [live_job, expired_job])), encoding="utf-8")
+    existing_live = {
+        "offre": live_job,
+        "analyse": rank.refresh_existing_analysis({"modele": rank.DEFAULT_MODEL, "points_forts": [], "points_a_verifier": []}, live_job, "AWS Terraform Linux", ""),
+        "description": "AWS Terraform Linux",
+    }
+    orphan = {
+        "offre": {"job_id": "999", "job_title": "Adobe Experience Platform Engineer"},
+        "analyse": existing_live["analyse"],
+        "description": "Legacy off-target row",
+    }
+    stale_exclusion = {"job": {"job_id": "1"}, "reason": "We have over 15 years of industry experience."}
+    report.with_suffix(".json").write_text(json.dumps({
+        "analyses": [existing_live, orphan],
+        "echecs": [],
+        "exclusions": [stale_exclusion],
+    }), encoding="utf-8")
+
+    with patch("sys.argv", ["local_rank", str(jobs), str(report), "--resume", "--prune-orphans"]), \
+         patch.object(rank.fetcher, "fetch_job_detail", return_value=(None, None, "not_found")) as fetch, \
+         patch.object(rank, "ollama_available", return_value=False), \
+         patch.object(rank.time, "sleep"):
+        rank.main()
+        rank.main()
+
+    fetch.assert_called_once_with("2", session=ANY)
+    data = json.loads(report.with_suffix(".json").read_text(encoding="utf-8"))
+    assert [row["offre"]["job_id"] for row in data["analyses"]] == ["1"]
+    assert data["exclusions"] == []
+    assert len(data["echecs"]) == 1 and data["echecs"][0]["job"]["job_id"] == "2" and data["echecs"][0]["terminal"] is True
+
+
+def test_indeed_search_validates_url_and_cleans_markdown():
+    ind_spec = importlib.util.spec_from_file_location("indeed_search", Path(__file__).resolve().parents[1] / "indeed_search.py")
+    ind = importlib.util.module_from_spec(ind_spec)
+    ind_spec.loader.exec_module(ind)
+
+    for bad_url in (
+        "http://au.indeed.com/viewjob?jk=1",
+        "https://evil.com/viewjob?jk=1",
+        "https://au.indeed.com.evil.com/viewjob?jk=1",
+        "https://user:pass@au.indeed.com/viewjob?jk=1",
+        "https://au.indeed.com:8443/viewjob?jk=1",
+    ):
+        assert ind.normalize_row({"id": "1", "title": "Cloud Engineer", "job_url": bad_url}, "Cloud") is None, bad_url
+
+    row = ind.normalize_row({
+        "id": "abc", "title": "Cloud Engineer", "company": "AC3 Pty Limited",
+        "job_url": "https://au.indeed.com/viewjob?jk=abc",
+        "description": "### **About**\n* **AWS** and __Terraform__***",
+    }, "Cloud")
+    assert row is not None
+    assert "**" not in row["description"] and "__" not in row["description"] and "###" not in row["description"]
+    assert "AWS and Terraform" in row["description"]
+
+
+def test_render_escapes_markdown_and_blocks_non_https_urls(tmp_path):
+    report = tmp_path / "report.md"
+    analysis = rank.refresh_existing_analysis({"points_forts": ["AWS\nLinux"], "points_a_verifier": []}, {"job_title": "Cloud [AU] (AWS)"}, "AWS", "AWS")
+    rank.render([{
+        "offre": {
+            "job_id": "1", "job_title": "Cloud [AU] (AWS)\nEngineer",
+            "business_name": "Acme (Pty)", "area": "Sydney [NSW]",
+            "url": "javascript:alert(1)",
+        },
+        "analyse": analysis,
+    }], report)
+    md = report.read_text(encoding="utf-8")
+    assert r"Cloud \[AU\] \(AWS\) Engineer" in md
+    assert r"Acme \(Pty\) — Sydney \[NSW\]" in md
+    assert "javascript:" not in md
+    assert "AWS Linux" in md
+

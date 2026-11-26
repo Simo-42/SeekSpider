@@ -13,3 +13,9 @@ venv/
 logs/
 *.log
 .DS_Store
+data/
+output/
+.env
+.env.*
+.impeccable/
+tests/

@@ -26,7 +26,7 @@
       --accent-strong: #06b6d4;
       --accent-bg: rgba(34, 211, 238, 0.12);
       --accent-btn-bg: #0e7490;
-      --accent-btn-hover: #0891b2;
+      --accent-btn-hover: #0a5c73;
       --accent-btn-text: #ffffff;
 
       --success-text: #34d399;
@@ -791,7 +791,7 @@
       min-height: 38px;
       padding: 7px 12px;
       border-radius: var(--radius-sm);
-      border: 1px solid var(--border-strong);
+      border: 1px solid rgba(148, 163, 184, 0.55);
       background: var(--bg-inset);
       color: var(--text-primary);
       font-family: inherit;
@@ -800,7 +800,7 @@
     }
     .text-input:hover,
     .select-input:hover {
-      border-color: rgba(148, 163, 184, 0.48);
+      border-color: rgba(148, 163, 184, 0.75);
     }
     .text-input:focus,
     .select-input:focus {
@@ -841,7 +841,7 @@
       display: inline-flex;
       flex-wrap: wrap;
       background: var(--bg-inset);
-      border: 1px solid var(--border-strong);
+      border: 1px solid rgba(148, 163, 184, 0.55);
       border-radius: var(--radius-sm);
       padding: 2px;
       gap: 2px;
@@ -887,7 +887,7 @@
       min-height: 38px;
       padding: 6px 12px;
       border-radius: var(--radius-sm);
-      border: 1px solid var(--border-strong);
+      border: 1px solid rgba(148, 163, 184, 0.55);
       background: var(--bg-inset);
       color: var(--text-secondary);
       font-family: inherit;
@@ -902,7 +902,7 @@
     }
     .toggle-btn:hover {
       color: var(--text-primary);
-      border-color: rgba(148, 163, 184, 0.48);
+      border-color: rgba(148, 163, 184, 0.75);
     }
     .toggle-btn[aria-pressed="true"] {
       background: var(--accent-bg);
@@ -915,7 +915,7 @@
       width: 15px;
       height: 15px;
       border-radius: 4px;
-      border: 1px solid var(--border-strong);
+      border: 1px solid rgba(148, 163, 184, 0.55);
       display: grid;
       place-items: center;
       flex-shrink: 0;
@@ -1080,6 +1080,18 @@
       background: var(--bg-inset);
       border-color: var(--border-strong);
     }
+    .job-badge.badge-contact {
+      font-weight: 500;
+      color: var(--success-text);
+      background: var(--bg-inset);
+      border-color: var(--success-border);
+    }
+    .job-badge.badge-info {
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: rgba(34, 211, 238, 0.08);
+      border-color: rgba(34, 211, 238, 0.28);
+    }
 
     .job-meta-row {
       display: flex;
@@ -1226,6 +1238,7 @@
       display: inline-flex;
       align-items: center;
       gap: 6px;
+      overflow-wrap: anywhere;
     }
 
     .detail-id {
@@ -1658,12 +1671,12 @@
           </div>
           <div class="brand-text">
             <h1>SeekSpider — Offres Australie</h1>
-            <p class="brand-subtitle">Consultation locale des annonces SEEK et analyses indicatives</p>
+            <p class="brand-subtitle">Consultation locale des annonces SEEK &amp; Indeed AU et analyses indicatives</p>
           </div>
         </div>
 
         <div class="topbar-status">
-          <div class="sync-meta" aria-live="polite" id="sync-meta">
+          <div class="sync-meta" id="sync-meta">
             <span class="status-dot" id="sync-dot" aria-hidden="true"></span>
             <span id="sync-text">Connexion à /api/state…</span>
           </div>
@@ -1717,7 +1730,7 @@
             <span id="search-meter-count"></span>
             <strong id="search-meter-percent"></strong>
           </div>
-          <div class="search-track" id="search-track" role="progressbar" aria-label="Progression de la collecte SEEK">
+          <div class="search-track" id="search-track" role="progressbar" aria-valuemin="0" aria-label="Progression de la collecte SEEK">
             <div class="search-fill" id="search-fill"></div>
           </div>
         </div>
@@ -1804,7 +1817,7 @@
           <line x1="12" y1="17" x2="12.01" y2="17"></line>
         </svg>
         <div>
-          <strong>Visa et habilitations restent à vérifier</strong> dans l’annonce officielle SEEK.
+          <strong>Visa et habilitations restent à vérifier</strong> dans l’annonce officielle (SEEK ou Indeed AU).
         </div>
       </div>
 
@@ -1938,11 +1951,12 @@
           </div>
 
           <div class="control-group">
-            <span class="control-label">Cibles PVT</span>
+            <span class="control-label" id="pvt-targets-label">Cibles PVT</span>
             <button
               type="button"
               class="toggle-btn"
               id="pvt-targets-btn"
+              aria-labelledby="pvt-targets-label pvt-targets-btn-label"
               aria-pressed="false"
               title="Agences IT contrat (Talenza, TalentWeb, Green Light, Hays, Paxus…) et partenaires AWS / MSP"
             >
@@ -1951,17 +1965,18 @@
                   <polyline points="20 6 9 17 4 12"></polyline>
                 </svg>
               </span>
-              <span>Agences &amp; AWS/MSP</span>
+              <span id="pvt-targets-btn-label">Agences &amp; AWS/MSP</span>
               <span class="seg-count" id="count-pvt-targets">0</span>
             </button>
           </div>
 
           <div class="control-group">
-            <span class="control-label">WHV 417</span>
+            <span class="control-label" id="whv-blocks-label">WHV 417</span>
             <button
               type="button"
               class="toggle-btn"
               id="hide-whv-blocks-btn"
+              aria-labelledby="whv-blocks-label hide-whv-blocks-btn-label"
               aria-pressed="false"
               title="Filtre réversible : masque temporairement les offres mentionnant une habilitation de sécurité ou une restriction Citizen / PR sans rien supprimer."
             >
@@ -1970,7 +1985,7 @@
                   <polyline points="20 6 9 17 4 12"></polyline>
                 </svg>
               </span>
-              <span>Masquer habilitations &amp; Citizen/PR</span>
+              <span id="hide-whv-blocks-btn-label">Masquer habilitations &amp; Citizen/PR</span>
               <span class="seg-count" id="count-whv-blocks">0</span>
             </button>
           </div>
@@ -1994,14 +2009,14 @@
           </div>
 
           <div class="control-group">
-            <span class="control-label">Analyse</span>
-            <button type="button" class="toggle-btn" id="analysed-only-btn" aria-pressed="false">
+            <span class="control-label" id="analysed-only-label">Analyse</span>
+            <button type="button" class="toggle-btn" id="analysed-only-btn" aria-labelledby="analysed-only-label analysed-only-btn-label" aria-pressed="false">
               <span class="toggle-check" aria-hidden="true">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="20 6 9 17 4 12"></polyline>
                 </svg>
               </span>
-              <span>Analyses disponibles uniquement</span>
+              <span id="analysed-only-btn-label">Analyses disponibles uniquement</span>
               <span class="seg-count" id="count-analysed-filter">0</span>
             </button>
           </div>
@@ -2051,12 +2066,24 @@
       "use strict";
 
       const POLL_INTERVAL_MS = 5000;
+      const POLL_INTERVAL_IDLE_MS = 20000;
+      const SEARCH_DEBOUNCE_MS = 140;
       const API_URL = "/api/state";
       const API_SEARCH_URL = "/api/search/start";
       const API_INDEED_SEARCH_URL = "/api/search/indeed/start";
       const API_START_URL = "/api/analysis/start";
       const API_STOP_URL = "/api/analysis/stop";
       const API_TRIAGE_URL = "/api/triage";
+
+      const ALLOWED_JOB_HOSTS = new Set(["www.seek.com.au", "seek.com.au", "au.indeed.com"]);
+      const SYDNEY_AREAS = [
+        "sydney", "macquarie park", "north sydney", "parramatta",
+        "barangaroo", "chatswood", "surry hills", "pyrmont", "mascot"
+      ];
+      const MELBOURNE_AREAS = [
+        "melbourne", "camberwell", "richmond", "hawthorn", "southbank",
+        "essendon", "docklands", "cremorne", "box hill", "mulgrave", "narre warren"
+      ];
 
       const TRIAGE_STATUSES = [
         { value: "todo", label: "À voir", badgeLabel: "", badgeClass: "" },
@@ -2074,7 +2101,8 @@
       const NO_EVIDENCE_RE = /^(?:non\s+pr[eé]cis[eé]|aucun\s+extrait\s+pertinent\s+rep[eé]r[eé]\s+automatiquement)$/i;
       const CLEARANCE_FALLBACK_RE = /\b(?:nv1|nv2|pv|baseline|agsva|security\s+clearance|negative\s+vetting|positive\s+vetting|clearance)\b/i;
       const NO_CLEARANCE_RE = /\bno\s+(?:security\s+)?clearance\s+(?:required|needed)\b/i;
-      const CITIZEN_PR_FALLBACK_RE = /\b(?:australian\s+citizen(?:ship)?|citizen(?:ship)?\s+(?:only|required|mandatory)|permanent\s+residen(?:t|cy)|pr\s+(?:only|required|holder)|full\s+working\s+rights|unrestricted\s+work(?:ing)?\s+rights|no\s+(?:visa\s+)?sponsor(?:ship)?|must\s+be\s+(?:an?\s+)?(?:australian\s+)?citizen)\b/i;
+      const CITIZEN_PR_FALLBACK_RE = /\b(?:australian\s+citizen(?:ship)?|citizen(?:ship)?\s+(?:only|required|mandatory)|permanent\s+residen(?:t|cy)|pr\s+(?:only|required|holder)|full\s+working\s+rights|unrestricted\s+work(?:ing)?\s+rights|must\s+be\s+(?:an?\s+)?(?:australian\s+)?citizen)\b/i;
+      const NO_SPONSORSHIP_FALLBACK_RE = /\b(?:no\s+(?:visa\s+)?sponsor(?:ship)?|unable\s+to\s+sponsor|not\s+offering\s+(?:visa\s+)?sponsor(?:ship)?)\b/i;
       const EQUAL_OPP_CITIZENSHIP_RE = /\b(?:regardless\s+of|without\s+regard\s+to)\b[^.]{0,120}\bcitizenship\b/i;
       const CONTRACT_WORK_TYPE_RE = /contract|temp|casual/i;
       const FULLTIME_WORK_TYPE_RE = /full[\s-]*time/i;
@@ -2083,13 +2111,18 @@
       let profileSignature = "";
       let searchPreviewSignature = "";
       let searchClock = null;
+      let searchDebounceTimer = null;
       let triageRequestSeq = 0;
+      let pollGeneration = 0;
+      let userSelectionSeq = 0;
+      const triageQueues = Object.create(null);
 
       const state = {
         jobs: [],
         rawJobsCount: 0,
         analyses: Object.create(null),
         triage: Object.create(null),
+        confirmedTriage: Object.create(null),
         triageDrafts: Object.create(null),
         triageFeedback: Object.create(null),
         triagePending: Object.create(null),
@@ -2125,6 +2158,7 @@
         lastUpdatedAt: null,
         lastError: null,
         pollTimer: null,
+        lastListSignature: "",
         lastDetailSignature: ""
       };
 
@@ -2278,6 +2312,42 @@
         }
       }
 
+      function toFiniteNumberOrNull(value) {
+        if (value === null || value === undefined || value === "" || typeof value === "boolean") {
+          return null;
+        }
+        const num = Number(value);
+        return Number.isFinite(num) ? num : null;
+      }
+
+      function normalizeSearchText(text) {
+        return String(text || "")
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .toLowerCase();
+      }
+
+      function formatWorkModeLabel(workMode) {
+        if (workMode === "remote") return "Remote";
+        if (workMode === "hybrid") return "Hybride";
+        if (workMode === "onsite") return "Sur site";
+        return "";
+      }
+
+      function formatEmployerTagLabel(tag) {
+        if (tag === "agency") return "Agence IT";
+        if (tag === "aws_msp") return "AWS / MSP";
+        if (tag === "public_sector") return "Secteur public";
+        return "";
+      }
+
+      function getTriageLabel(status) {
+        for (let i = 0; i < TRIAGE_STATUSES.length; i += 1) {
+          if (TRIAGE_STATUSES[i].value === status) return TRIAGE_STATUSES[i].label;
+        }
+        return "";
+      }
+
       function getSafeSeekUrl(rawUrl) {
         if (typeof rawUrl !== "string") return null;
         const trimmed = rawUrl.trim();
@@ -2286,16 +2356,12 @@
           const parsed = new URL(trimmed);
           if (parsed.protocol !== "https:") return null;
           if (parsed.username || parsed.password) return null;
+          if (parsed.port !== "") return null;
           const host = parsed.hostname.toLowerCase();
-          if (
-            host === "seek.com.au" ||
-            host.endsWith(".seek.com.au") ||
-            host === "indeed.com" ||
-            host.endsWith(".indeed.com")
-          ) {
-            return parsed.href;
-          }
-          return null;
+          if (!ALLOWED_JOB_HOSTS.has(host)) return null;
+          const path = parsed.pathname || "";
+          if (!path.startsWith("/job/") && !path.startsWith("/viewjob")) return null;
+          return parsed.href;
         } catch (_err) {
           return null;
         }
@@ -2319,7 +2385,7 @@
           return now - 86400000;
         }
 
-        const relMatch = lower.match(/(\d+)\s*(month|mo|min|m|hour|hr|h|day|d|j|week|w|sem)/);
+        const relMatch = lower.match(/(\d+)\+?\s*(month|mo|min|m|hour|hr|h|day|d|j|week|w|sem)/);
         if (relMatch) {
           const amount = Number(relMatch[1]);
           const unit = relMatch[2];
@@ -2370,7 +2436,8 @@
           return {
             clearance: Boolean(raw.whv_flags.clearance),
             citizen_pr_risk: Boolean(raw.whv_flags.citizen_pr_risk),
-            visa_mention: Boolean(raw.whv_flags.visa_mention)
+            visa_mention: Boolean(raw.whv_flags.visa_mention),
+            no_sponsorship: Boolean(raw.whv_flags.no_sponsorship)
           };
         }
         const habProof = NO_EVIDENCE_RE.test(preuveHabilitation) ? "" : preuveHabilitation;
@@ -2385,11 +2452,48 @@
           CITIZEN_PR_FALLBACK_RE.test(visaProof) &&
           !EQUAL_OPP_CITIZENSHIP_RE.test(visaProof)
         );
+        const noSponsorship = Boolean(
+          visaProof && NO_SPONSORSHIP_FALLBACK_RE.test(visaProof)
+        );
         return {
           clearance: clearance,
           citizen_pr_risk: citizenPrRisk,
-          visa_mention: Boolean(visaProof)
+          visa_mention: Boolean(visaProof),
+          no_sponsorship: noSponsorship
         };
+      }
+
+      function normalizeContractDuration(rawDuration) {
+        if (!rawDuration || typeof rawDuration !== "object") {
+          return { months_min: null, months_max: null, label: "", whv_fit: "unknown" };
+        }
+        const whvFit = rawDuration.whv_fit === "ideal" || rawDuration.whv_fit === "long"
+          ? rawDuration.whv_fit
+          : "unknown";
+        return {
+          months_min: toFiniteNumberOrNull(rawDuration.months_min),
+          months_max: toFiniteNumberOrNull(rawDuration.months_max),
+          label: asText(rawDuration.label, ""),
+          whv_fit: whvFit
+        };
+      }
+
+      function normalizeRecruiterContacts(rawContacts) {
+        if (!rawContacts || typeof rawContacts !== "object") {
+          return { emails: [], phones: [] };
+        }
+        return {
+          emails: asStringList(rawContacts.emails),
+          phones: asStringList(rawContacts.phones)
+        };
+      }
+
+      function hasRecruiterContact(analysis) {
+        return Boolean(
+          analysis &&
+          analysis.recruiter_contacts &&
+          (analysis.recruiter_contacts.emails.length > 0 || analysis.recruiter_contacts.phones.length > 0)
+        );
       }
 
       function normalizeAnalysis(raw) {
@@ -2398,15 +2502,19 @@
         const hasScore = !raw.score_obsolete && Number.isFinite(rawScore) && rawScore >= 0 && rawScore <= 100;
         const preuveVisa = asText(raw.preuve_visa, "Non précisé");
         const preuveHabilitation = asText(raw.preuve_habilitation, "Non précisé");
+        const rawWorkMode = asText(raw.work_mode, "").toLowerCase();
+        const workMode = (rawWorkMode === "remote" || rawWorkMode === "hybrid" || rawWorkMode === "onsite")
+          ? rawWorkMode
+          : "";
         return {
           score: hasScore ? Math.round(rawScore) : null,
           score_method: asText(raw.score_method, ""),
           score_stale: Boolean(raw.score_obsolete) || !hasScore,
           role_category: asText(raw.role_category, "Famille non classée"),
-          score_role: Number.isFinite(Number(raw.score_role)) ? Number(raw.score_role) : null,
-          score_skills: Number.isFinite(Number(raw.score_skills)) ? Number(raw.score_skills) : null,
-          score_location: Number.isFinite(raw.score_location) ? raw.score_location : null,
-          score_experience: Number.isFinite(raw.score_experience) ? raw.score_experience : null,
+          score_role: toFiniteNumberOrNull(raw.score_role),
+          score_skills: toFiniteNumberOrNull(raw.score_skills),
+          score_location: toFiniteNumberOrNull(raw.score_location),
+          score_experience: toFiniteNumberOrNull(raw.score_experience),
           experience_score_reason: asText(raw.experience_score_reason, ""),
           competences_reperees: asStringList(raw.competences_reperees),
           competences_manquantes: asStringList(raw.competences_manquantes),
@@ -2421,7 +2529,10 @@
           preuve_visa: preuveVisa,
           habilitation: asText(raw.habilitation, "Non précisé"),
           preuve_habilitation: preuveHabilitation,
-          whv_flags: deriveWhvFlags(raw, preuveVisa, preuveHabilitation)
+          whv_flags: deriveWhvFlags(raw, preuveVisa, preuveHabilitation),
+          contract_duration: normalizeContractDuration(raw.contract_duration),
+          work_mode: workMode,
+          recruiter_contacts: normalizeRecruiterContacts(raw.recruiter_contacts)
         };
       }
 
@@ -2429,7 +2540,7 @@
         if (!raw || typeof raw !== "object") return null;
         const status = typeof raw.status === "string" && VALID_TRIAGE_STATUSES.has(raw.status) ? raw.status : "todo";
         const note = typeof raw.note === "string" ? raw.note.slice(0, 500) : "";
-        const updatedAt = Number.isFinite(Number(raw.updated_at)) ? Number(raw.updated_at) : null;
+        const updatedAt = toFiniteNumberOrNull(raw.updated_at);
         if (status === "todo" && note.trim() === "") return null;
         return { status: status, note: note, updated_at: updatedAt };
       }
@@ -2444,7 +2555,7 @@
 
       function getWhvFlags(analysis) {
         if (!analysis || !analysis.whv_flags) {
-          return { clearance: false, citizen_pr_risk: false, visa_mention: false };
+          return { clearance: false, citizen_pr_risk: false, visa_mention: false, no_sponsorship: false };
         }
         return analysis.whv_flags;
       }
@@ -2510,8 +2621,12 @@
       function matchesRegion(job, region) {
         if (region === "all") return true;
         const areaLower = job.area.toLowerCase();
-        if (region === "sydney") return areaLower.includes("sydney");
-        if (region === "melbourne") return areaLower.includes("melbourne");
+        if (region === "sydney") {
+          return SYDNEY_AREAS.some(function (loc) { return areaLower.includes(loc); });
+        }
+        if (region === "melbourne") {
+          return MELBOURNE_AREAS.some(function (loc) { return areaLower.includes(loc); });
+        }
         return true;
       }
 
@@ -2536,10 +2651,14 @@
           job.area,
           job.work_type,
           job.pay_range,
-          job.id
+          job.id,
+          job.source === "indeed" ? "Indeed AU" : "SEEK",
+          formatEmployerTagLabel(job.employer_tag)
         ];
-        if (triage && triage.note) {
-          haystacks.push(triage.note);
+        if (triage) {
+          const triageLabel = getTriageLabel(triage.status);
+          if (triageLabel) haystacks.push(triageLabel);
+          if (triage.note) haystacks.push(triage.note);
         }
         if (analysis) {
           haystacks.push(
@@ -2548,14 +2667,23 @@
             analysis.visa_sponsoring,
             analysis.preuve_visa,
             analysis.habilitation,
-            analysis.preuve_habilitation
+            analysis.preuve_habilitation,
+            analysis.work_mode,
+            formatWorkModeLabel(analysis.work_mode),
+            analysis.contract_duration ? analysis.contract_duration.label : ""
           );
+          if (analysis.recruiter_contacts) {
+            haystacks.push(
+              ...analysis.recruiter_contacts.emails,
+              ...analysis.recruiter_contacts.phones
+            );
+          }
           if (analysis.score !== null) {
             haystacks.push(analysis.resume, ...analysis.competences_reperees, ...analysis.competences_manquantes,
               ...analysis.points_forts, ...analysis.points_a_verifier);
           }
         }
-        return haystacks.join(" ").toLowerCase().includes(query);
+        return normalizeSearchText(haystacks.join(" ")).includes(query);
       }
 
       function jobAgeDays(job) {
@@ -2575,7 +2703,7 @@
       }
 
       function getFilteredAndSortedJobs() {
-        const query = state.search.trim().toLowerCase();
+        const query = normalizeSearchText(state.search.trim());
         const filtered = [];
 
         for (let i = 0; i < state.jobs.length; i += 1) {
@@ -2695,18 +2823,36 @@
           addEl("line", { x1: "12", y1: "16", x2: "12.01", y2: "16" });
         } else if (kind === "shield") {
           addEl("path", { d: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" });
+        } else if (kind === "clock") {
+          addEl("circle", { cx: "12", cy: "12", r: "10" });
+          addEl("polyline", { points: "12 6 12 12 16 14" });
+        } else if (kind === "mail") {
+          addEl("rect", { x: "2", y: "4", width: "20", height: "16", rx: "2" });
+          addEl("polyline", { points: "22 6 12 13 2 6" });
         }
         return svg;
+      }
+
+      function isActivePolling() {
+        const searchRunning = Boolean(state.searchTask && state.searchTask.status === "running");
+        const analysisStatus = asText(state.progress.status, "").toLowerCase();
+        const analysisRunning = analysisStatus === "running" || analysisStatus === "stopping";
+        return searchRunning || analysisRunning;
+      }
+
+      function getPollIntervalMs() {
+        return (isActivePolling() || Boolean(state.lastError)) ? POLL_INTERVAL_MS : POLL_INTERVAL_IDLE_MS;
       }
 
       function renderSyncHeader() {
         const prog = state.progress;
         const statusInfo = mapProgressStatus(prog.status, prog.completed, prog.total);
+        const intervalSec = Math.round(getPollIntervalMs() / 1000);
 
         els.syncDot.className = "status-dot";
         if (state.lastError) {
           els.syncDot.classList.add("is-error");
-          els.syncText.textContent = "Erreur de synchronisation — nouvel essai dans 5 s";
+          els.syncText.textContent = "Erreur de synchronisation — nouvel essai dans " + intervalSec + " s";
         } else if (!state.hasLoadedOnce) {
           els.syncDot.classList.add("is-running");
           els.syncText.textContent = "Chargement initial…";
@@ -2714,8 +2860,8 @@
           if (statusInfo.tone) els.syncDot.classList.add(statusInfo.tone);
           const timeStr = formatTime(state.lastUpdatedAt);
           els.syncText.textContent = timeStr
-            ? "Mis à jour à " + timeStr + " (toutes les 5 s)"
-            : "Synchronisation active (toutes les 5 s)";
+            ? "Mis à jour à " + timeStr + " (toutes les " + intervalSec + " s)"
+            : "Synchronisation active (toutes les " + intervalSec + " s)";
         }
 
         els.refreshBtn.disabled = state.isFetching;
@@ -2797,13 +2943,24 @@
         const running = task && task.status === "running";
         const pending = state.pendingAction === API_SEARCH_URL || state.pendingAction === API_INDEED_SEARCH_URL;
         const analysing = state.progress.status === "running";
-        const disableSearch = !task || !task.can_start || running || analysing || Boolean(state.pendingAction);
+        const disableSearch = Boolean(state.lastError) || !task || !task.can_start || running || analysing || Boolean(state.pendingAction);
         els.startSearchBtn.disabled = disableSearch;
         els.startSearchBtn.setAttribute("aria-busy", String(Boolean(running || state.pendingAction === API_SEARCH_URL)));
         if (els.startIndeedBtn) {
           els.startIndeedBtn.disabled = disableSearch;
           els.startIndeedBtn.setAttribute("aria-busy", String(Boolean(running || state.pendingAction === API_INDEED_SEARCH_URL)));
         }
+
+        const isIndeedSearch =
+          state.pendingAction === API_INDEED_SEARCH_URL ||
+          Boolean(
+            task && (
+              task.source === "indeed" ||
+              /indeed/i.test(task.message || "") ||
+              /indeed/i.test(task.last_query || "")
+            )
+          );
+        const searchSourceName = isIndeedSearch ? "Indeed AU" : "SEEK";
 
         let message = state.hasLoadedOnce ? "Recherche indisponible sur ce serveur." : "Connexion au serveur local…";
         if (state.searchTaskError) {
@@ -2814,10 +2971,10 @@
             : "Lancement de la recherche sur SEEK…";
         } else if (task) {
           const defaults = {
-            idle: analysing ? "Attendez la fin de l’analyse en cours." : "Lancez une recherche sur SEEK.",
-            running: "Recherche sur SEEK en cours.",
+            idle: analysing ? "Attendez la fin de l’analyse en cours." : "Lancez une collecte sur SEEK ou Indeed AU.",
+            running: "Recherche sur " + searchSourceName + " en cours.",
             finished: task.new_jobs === 0 ? "Aucune nouvelle offre trouvée." : "Nouvelles offres ajoutées.",
-            failed: "La recherche sur SEEK a échoué."
+            failed: "La recherche sur " + searchSourceName + " a échoué."
           };
           message = task.message || defaults[task.status] || defaults.idle;
         }
@@ -2831,6 +2988,7 @@
         els.searchPanel.dataset.state = phase || "idle";
         els.searchMeter.hidden = !showMeter;
         els.searchTrack.classList.toggle("is-indeterminate", showMeter && total === 0);
+        els.searchTrack.setAttribute("aria-label", "Progression de la collecte " + searchSourceName);
         els.searchFill.style.width = total ? percent + "%" : "";
         els.searchMeterCount.textContent = total ? completed + " / " + total + " pages lues" : "Démarrage…";
         els.searchMeterPercent.textContent = total ? percent + " %" : "";
@@ -2873,8 +3031,8 @@
         }
 
         const isSearching = state.searchTask && state.searchTask.status === "running";
-        const disableStart = !state.hasLoadedOnce || state.pendingAction || isRunning || isSearching || state.progress.can_start === false;
-        const disableStop = !state.hasLoadedOnce || state.pendingAction || !isRunning || state.progress.can_stop === false;
+        const disableStart = Boolean(state.lastError) || !state.hasLoadedOnce || state.pendingAction || isRunning || isSearching || state.progress.can_start === false;
+        const disableStop = Boolean(state.lastError) || !state.hasLoadedOnce || state.pendingAction || !isRunning || state.progress.can_stop === false;
         els.startAnalysisBtn.disabled = Boolean(disableStart);
         els.stopAnalysisBtn.disabled = Boolean(disableStop);
         els.startAnalysisBtn.setAttribute("aria-busy", String(state.pendingAction === API_START_URL));
@@ -2967,7 +3125,7 @@
         els.countSourceAll.textContent = String(state.jobs.length);
         els.countSourceSeek.textContent = String(sourceSeek);
         els.countSourceIndeed.textContent = String(sourceIndeed);
-        els.countWhvBlocks.textContent = String(whvBlocks);
+        els.countWhvBlocks.textContent = whvBlocks > 0 ? "-" + whvBlocks : "0";
         els.countAnalysedFilter.textContent = String(analysed);
 
         const familyOptions = els.familySelect.options;
@@ -3015,7 +3173,66 @@
         return box;
       }
 
+      function buildListSignature(entries) {
+        if (!state.hasLoadedOnce) return "loading";
+        const parts = [
+          "1|" + state.jobs.length + "|" + state.rawJobsCount + "|" + entries.length
+        ];
+        for (let i = 0; i < entries.length; i += 1) {
+          const entry = entries[i];
+          const job = entry.job;
+          const analysis = entry.analysis;
+          const triage = entry.triage || getTriageForJob(job);
+          const whvFlags = getWhvFlags(analysis);
+          const duration = analysis && analysis.contract_duration ? analysis.contract_duration : null;
+          const ageDays = jobAgeDays(job);
+          parts.push(
+            job.id + "\x1f" +
+            (analysis ? (analysis.score !== null ? String(analysis.score) : "stale") : "none") + "\x1f" +
+            triage.status + "\x1f" +
+            (whvFlags.clearance ? "1" : "0") +
+            (whvFlags.citizen_pr_risk ? "1" : "0") +
+            (whvFlags.visa_mention ? "1" : "0") +
+            (whvFlags.no_sponsorship ? "1" : "0") + "\x1f" +
+            job.employer_tag + "\x1f" +
+            job.source + "\x1f" +
+            (duration ? duration.whv_fit + ":" + duration.label : "") + "\x1f" +
+            (analysis ? analysis.work_mode : "") + "\x1f" +
+            (hasRecruiterContact(analysis) ? "1" : "0") + "\x1f" +
+            (ageDays !== null && ageDays > 21 ? "1" : "0")
+          );
+        }
+        return parts.join("\n");
+      }
+
+      function syncListSelectionInPlace() {
+        const currentBtns = els.listContainer.querySelectorAll('.job-item-btn[aria-current="true"]');
+        let alreadyCurrent = false;
+        for (let i = 0; i < currentBtns.length; i += 1) {
+          if (currentBtns[i].dataset.jobId === state.selectedId) {
+            alreadyCurrent = true;
+          } else {
+            currentBtns[i].removeAttribute("aria-current");
+          }
+        }
+        if (alreadyCurrent || state.selectedId === null) return;
+        const buttons = els.listContainer.querySelectorAll(".job-item-btn");
+        for (let b = 0; b < buttons.length; b += 1) {
+          if (buttons[b].dataset.jobId === state.selectedId) {
+            buttons[b].setAttribute("aria-current", "true");
+            break;
+          }
+        }
+      }
+
       function renderList(entries) {
+        const nextListSig = buildListSignature(entries);
+        if (nextListSig === state.lastListSignature) {
+          syncListSelectionInPlace();
+          return;
+        }
+        state.lastListSignature = nextListSig;
+
         const activeEl = document.activeElement;
         const focusedJobId = activeEl && els.listContainer.contains(activeEl) && activeEl.dataset
           ? activeEl.dataset.jobId || null
@@ -3057,7 +3274,7 @@
           els.listContainer.appendChild(
             createStateBox(
               "Aucune offre disponible pour le moment",
-              "Le serveur local n'a encore retourné aucune annonce. La liste se met à jour automatiquement toutes les 5 secondes.",
+              "Le serveur local n'a encore retourné aucune annonce. La liste se met à jour automatiquement.",
               null,
               null
             )
@@ -3097,10 +3314,6 @@
           if (isSelected) {
             btn.setAttribute("aria-current", "true");
           }
-
-          btn.addEventListener("click", function () {
-            selectJob(job.id, true);
-          });
 
           const topRow = document.createElement("div");
           topRow.className = "job-row-top";
@@ -3149,6 +3362,29 @@
             badgesRow.appendChild(contractPill);
           }
 
+          if (analysis && analysis.contract_duration && analysis.contract_duration.label) {
+            if (analysis.contract_duration.whv_fit === "ideal") {
+              const durPill = document.createElement("span");
+              durPill.className = "job-badge badge-applied";
+              durPill.textContent = analysis.contract_duration.label;
+              durPill.title = "Durée adaptée à la limite de 6 mois du WHV 417";
+              badgesRow.appendChild(durPill);
+            } else if (analysis.contract_duration.whv_fit === "long") {
+              const durPill = document.createElement("span");
+              durPill.className = "job-badge badge-warning";
+              durPill.textContent = analysis.contract_duration.label;
+              durPill.title = "Contrat ≥ 10 mois : vérifier la compatibilité avec la limite de 6 mois du WHV 417";
+              badgesRow.appendChild(durPill);
+            }
+          }
+
+          if (analysis && (analysis.work_mode === "remote" || analysis.work_mode === "hybrid")) {
+            const modePill = document.createElement("span");
+            modePill.className = "job-badge badge-family";
+            modePill.textContent = formatWorkModeLabel(analysis.work_mode);
+            badgesRow.appendChild(modePill);
+          }
+
           if (job.source === "indeed") {
             const srcPill = document.createElement("span");
             srcPill.className = "job-badge badge-family";
@@ -3173,6 +3409,14 @@
             pubPill.appendChild(pubTxt);
             pubPill.title = "Organisme public / conseil / gouvernement : vérifier l'exigence de citoyenneté australienne";
             badgesRow.appendChild(pubPill);
+          }
+
+          if (hasRecruiterContact(analysis)) {
+            const contactPill = document.createElement("span");
+            contactPill.className = "job-badge badge-contact";
+            contactPill.textContent = "Contact direct";
+            contactPill.title = "Email ou téléphone de recruteur repéré dans l'annonce";
+            badgesRow.appendChild(contactPill);
           }
 
           const ageDays = jobAgeDays(job);
@@ -3204,6 +3448,12 @@
             citizenPill.appendChild(citizenTxt);
             citizenPill.title = "Restriction citoyenneté australienne, résidence permanente ou droits de travail complets repérée";
             badgesRow.appendChild(citizenPill);
+          } else if (whvFlags.no_sponsorship) {
+            const noSponPill = document.createElement("span");
+            noSponPill.className = "job-badge badge-info";
+            noSponPill.textContent = "Sans sponsoring";
+            noSponPill.title = "Pas de sponsoring visa, mais potentiellement accessible en WHV 417 sur contrat ≤ 6 mois";
+            badgesRow.appendChild(noSponPill);
           }
 
           if (triage.status !== "todo") {
@@ -3322,12 +3572,9 @@
         }
       }
 
-      async function saveTriage(jobId, nextStatus, rawNote, fromStatusClick) {
+      function saveTriage(jobId, nextStatus, rawNote, fromStatusClick) {
         const safeStatus = VALID_TRIAGE_STATUSES.has(nextStatus) ? nextStatus : "todo";
         const note = typeof rawNote === "string" ? rawNote.slice(0, 500) : "";
-        const previousTriage = Object.prototype.hasOwnProperty.call(state.triage, jobId)
-          ? state.triage[jobId]
-          : null;
         const previousSelectedId = state.selectedId;
 
         let prevIndex = -1;
@@ -3343,6 +3590,7 @@
 
         triageRequestSeq += 1;
         const seq = triageRequestSeq;
+        pollGeneration += 1;
         state.triagePending[jobId] = seq;
 
         const optimistic = normalizeTriageEntry({
@@ -3357,94 +3605,142 @@
         }
         state.triageFeedback[jobId] = { text: "Enregistrement…", tone: "", seq: seq };
 
+        let autoSelectedId = null;
+        const selectionSeqAtAdvance = userSelectionSeq;
         if (prevIndex >= 0) {
           const afterEntries = getFilteredAndSortedJobs();
           const stillVisible = afterEntries.some(function (e) { return e.job.id === jobId; });
           if (!stillVisible) {
-            state.selectedId = afterEntries.length > 0
+            autoSelectedId = afterEntries.length > 0
               ? afterEntries[Math.min(prevIndex, afterEntries.length - 1)].job.id
               : null;
+            state.selectedId = autoSelectedId;
           }
         }
 
         renderAll();
 
-        try {
-          const response = await fetch(API_TRIAGE_URL, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Accept": "application/json"
-            },
-            body: JSON.stringify({ job_id: jobId, status: safeStatus, note: note }),
-            cache: "no-store"
-          });
-
-          let payload = null;
+        const prevPromise = triageQueues[jobId] || Promise.resolve();
+        const taskPromise = prevPromise.catch(function () {}).then(async function () {
           try {
-            payload = await response.json();
-          } catch (_parseErr) {
-            payload = null;
-          }
+            const response = await fetch(API_TRIAGE_URL, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+              },
+              body: JSON.stringify({ job_id: jobId, status: safeStatus, note: note }),
+              cache: "no-store"
+            });
 
-          const apiError = payload && typeof payload === "object" ? asText(payload.error, "") : "";
-          if (!response.ok || apiError) {
-            throw new Error(apiError || ("Erreur HTTP " + response.status + " lors de l'enregistrement."));
-          }
-
-          if (state.triagePending[jobId] !== seq) return;
-          delete state.triagePending[jobId];
-
-          const saved = payload && Object.prototype.hasOwnProperty.call(payload, "triage")
-            ? normalizeTriageEntry(payload.triage)
-            : optimistic;
-          if (saved) {
-            state.triage[jobId] = saved;
-          } else {
-            delete state.triage[jobId];
-          }
-          if (Object.prototype.hasOwnProperty.call(state.triageDrafts, jobId) && state.triageDrafts[jobId] === note) {
-            delete state.triageDrafts[jobId];
-          }
-
-          state.triageFeedback[jobId] = { text: "Enregistrée", tone: "is-saved", seq: seq };
-          renderAll();
-
-          window.setTimeout(function () {
-            if (state.triageFeedback[jobId] && state.triageFeedback[jobId].seq === seq) {
-              delete state.triageFeedback[jobId];
-              if (state.renderedDetailJobId === jobId) {
-                syncTriageControlsInPlace(jobId);
-              }
+            let payload = null;
+            try {
+              payload = await response.json();
+            } catch (_parseErr) {
+              payload = null;
             }
-          }, 2500);
-        } catch (err) {
-          if (state.triagePending[jobId] !== seq) return;
-          delete state.triagePending[jobId];
 
-          if (previousTriage) {
-            state.triage[jobId] = previousTriage;
-          } else {
-            delete state.triage[jobId];
+            const apiError = payload && typeof payload === "object" ? asText(payload.error, "") : "";
+            if (!response.ok || apiError) {
+              throw new Error(apiError || ("Erreur HTTP " + response.status + " lors de l'enregistrement."));
+            }
+
+            const saved = payload && Object.prototype.hasOwnProperty.call(payload, "triage")
+              ? normalizeTriageEntry(payload.triage)
+              : optimistic;
+            if (saved) {
+              state.confirmedTriage[jobId] = saved;
+            } else {
+              delete state.confirmedTriage[jobId];
+            }
+            pollGeneration += 1;
+
+            if (state.triagePending[jobId] !== seq) return;
+            delete state.triagePending[jobId];
+
+            if (saved) {
+              state.triage[jobId] = saved;
+            } else {
+              delete state.triage[jobId];
+            }
+            if (Object.prototype.hasOwnProperty.call(state.triageDrafts, jobId) && state.triageDrafts[jobId] === note) {
+              delete state.triageDrafts[jobId];
+            }
+
+            const hasNewerDraft = Object.prototype.hasOwnProperty.call(state.triageDrafts, jobId);
+            if (!hasNewerDraft) {
+              state.triageFeedback[jobId] = { text: "Enregistrée", tone: "is-saved", seq: seq };
+              window.setTimeout(function () {
+                if (state.triageFeedback[jobId] && state.triageFeedback[jobId].seq === seq) {
+                  delete state.triageFeedback[jobId];
+                  if (state.renderedDetailJobId === jobId) {
+                    syncTriageControlsInPlace(jobId);
+                  }
+                }
+              }, 2500);
+            } else {
+              delete state.triageFeedback[jobId];
+            }
+            renderAll();
+          } catch (err) {
+            pollGeneration += 1;
+            if (state.triagePending[jobId] !== seq) return;
+            delete state.triagePending[jobId];
+
+            const confirmed = Object.prototype.hasOwnProperty.call(state.confirmedTriage, jobId)
+              ? state.confirmedTriage[jobId]
+              : null;
+            if (confirmed) {
+              state.triage[jobId] = confirmed;
+            } else {
+              delete state.triage[jobId];
+            }
+            if (!Object.prototype.hasOwnProperty.call(state.triageDrafts, jobId)) {
+              state.triageDrafts[jobId] = note;
+            }
+            if (
+              fromStatusClick &&
+              previousSelectedId === jobId &&
+              userSelectionSeq === selectionSeqAtAdvance &&
+              state.selectedId === autoSelectedId
+            ) {
+              state.selectedId = jobId;
+            }
+            const reason = err && err.message ? err.message : "Enregistrement impossible.";
+            state.triageFeedback[jobId] = { text: reason, tone: "is-error", seq: seq };
+            renderAll();
           }
-          if (!Object.prototype.hasOwnProperty.call(state.triageDrafts, jobId)) {
-            state.triageDrafts[jobId] = note;
+        });
+
+        triageQueues[jobId] = taskPromise;
+        taskPromise.finally(function () {
+          if (triageQueues[jobId] === taskPromise) {
+            delete triageQueues[jobId];
           }
-          if (fromStatusClick && previousSelectedId === jobId) {
-            state.selectedId = jobId;
-          }
-          const reason = err && err.message ? err.message : "Enregistrement impossible.";
-          state.triageFeedback[jobId] = { text: reason, tone: "is-error", seq: seq };
-          renderAll();
-        }
+        });
+        return taskPromise;
       }
 
       function buildDetailSignature(selectedEntry) {
         if (!selectedEntry) {
           return "empty:" + (state.jobs.length === 0 ? "0" : "filtered");
         }
+        const job = selectedEntry.job;
         return JSON.stringify({
-          job: selectedEntry.job,
+          job: {
+            id: job.id,
+            hasExplicitId: job.hasExplicitId,
+            job_title: job.job_title,
+            business_name: job.business_name,
+            role_category: job.role_category,
+            employer_tag: job.employer_tag,
+            source: job.source,
+            area: job.area,
+            work_type: job.work_type,
+            pay_range: job.pay_range,
+            safeUrl: job.safeUrl,
+            posted_date: job.posted_date
+          },
           analysis: selectedEntry.analysis,
           mobile: state.mobileDetailOpen,
           progStatus: selectedEntry.analysis ? "" : state.progress.status
@@ -3467,6 +3763,10 @@
           state.selectedId = selectedEntry.job.id;
         }
 
+        if (!selectedEntry) {
+          state.mobileDetailOpen = false;
+        }
+
         els.workspace.classList.toggle("mobile-detail-open", Boolean(selectedEntry) && state.mobileDetailOpen);
 
         // Preserve focus and unsaved draft when polling fires while editing the note.
@@ -3482,12 +3782,17 @@
           }
           return;
         }
+
+        const isSameJob = Boolean(selectedEntry && state.renderedDetailJobId === selectedEntry.job.id);
+        const prevScrollTop = isSameJob ? els.detailPanel.scrollTop : 0;
+
         state.lastDetailSignature = nextSig;
         state.renderedDetailJobId = selectedEntry ? selectedEntry.job.id : null;
 
         els.detailPanel.textContent = "";
 
         if (!selectedEntry) {
+          state.mobileDetailOpen = false;
           els.workspace.classList.remove("mobile-detail-open");
           els.detailPanel.appendChild(
             createStateBox(
@@ -3499,6 +3804,7 @@
               null
             )
           );
+          els.detailPanel.scrollTop = 0;
           return;
         }
 
@@ -3511,6 +3817,7 @@
         const job = selectedEntry.job;
         const analysis = selectedEntry.analysis;
         const triage = getTriageForJob(job.id);
+        const sourceLabel = job.source === "indeed" ? "Indeed AU" : "SEEK";
 
         const backRow = document.createElement("div");
         backRow.className = "mobile-back-row";
@@ -3558,7 +3865,18 @@
 
         addFact("pin", job.area);
         if (job.work_type) addFact("briefcase", job.work_type);
+        if (analysis && analysis.contract_duration && analysis.contract_duration.label) {
+          addFact("clock", "Durée : " + analysis.contract_duration.label);
+        }
+        if (analysis && analysis.work_mode) {
+          const workModeLabel = formatWorkModeLabel(analysis.work_mode);
+          if (workModeLabel) addFact(null, "Mode : " + workModeLabel);
+        }
         if (job.pay_range) addFact(null, "Rémunération : " + job.pay_range);
+        if (hasRecruiterContact(analysis)) {
+          const contactItems = analysis.recruiter_contacts.emails.concat(analysis.recruiter_contacts.phones);
+          addFact("mail", "Contact : " + contactItems.join(" · "));
+        }
         addFact("calendar", "Publiée : " + formatPostedDate(job.posted_date));
         if (job.hasExplicitId) {
           const idLi = document.createElement("li");
@@ -3694,11 +4012,12 @@
             Number(state.progress.total) || 0
           );
           const pendingText = statusInfo.tone === "is-running"
-            ? "Cette offre fait partie de la liste dédoublonnée mais n'a pas encore été analysée. L'analyse est en cours et la vue s'actualise toutes les 5 secondes."
-            : "Aucune analyse locale n'est enregistrée pour cette offre pour le moment. Vous pouvez tout de même consulter l'annonce officielle sur SEEK.";
+            ? "Cette offre fait partie de la liste dédoublonnée mais n'a pas encore été analysée. L'analyse est en cours et la vue s'actualise automatiquement."
+            : "Aucune analyse locale n'est enregistrée pour cette offre pour le moment. Vous pouvez tout de même consulter l'annonce officielle sur " + sourceLabel + ".";
           els.detailPanel.appendChild(
             createStateBox("Analyse non disponible", pendingText, null, null)
           );
+          els.detailPanel.scrollTop = isSameJob ? prevScrollTop : 0;
           return;
         }
 
@@ -3856,7 +4175,7 @@
           if (isVisa) {
             const note = document.createElement("p");
             note.className = "visa-disclaimer";
-            note.textContent = "Mention visa / droit au travail à confirmer directement dans l'annonce SEEK.";
+            note.textContent = "Mention visa / droit au travail à confirmer directement dans l'annonce " + sourceLabel + ".";
             box.appendChild(note);
           }
           return box;
@@ -3874,6 +4193,7 @@
         section.appendChild(evidenceGrid);
 
         els.detailPanel.appendChild(section);
+        els.detailPanel.scrollTop = isSameJob ? prevScrollTop : 0;
       }
 
       function renderAll() {
@@ -3896,6 +4216,9 @@
       }
 
       function selectJob(jobId, fromUser) {
+        if (fromUser) {
+          userSelectionSeq += 1;
+        }
         state.selectedId = jobId;
         if (fromUser && window.matchMedia("(max-width: 1024px)").matches) {
           state.mobileDetailOpen = true;
@@ -3918,6 +4241,13 @@
       }
 
       function resetFilters() {
+        if (searchDebounceTimer !== null) {
+          window.clearTimeout(searchDebounceTimer);
+          searchDebounceTimer = null;
+        }
+        userSelectionSeq += 1;
+        state.mobileDetailOpen = false;
+        els.workspace.classList.remove("mobile-detail-open");
         state.search = "";
         state.region = "all";
         state.family = "all";
@@ -3952,7 +4282,7 @@
         els.searchInput.focus();
       }
 
-      function applyPayload(payload) {
+      function applyPayload(payload, fetchStartGeneration) {
         if (!payload || typeof payload !== "object") {
           throw new Error("Format JSON inattendu reçu de /api/state.");
         }
@@ -3975,7 +4305,9 @@
         }
         state.analyses = nextAnalyses;
 
-        if (payload.triage && typeof payload.triage === "object" && !Array.isArray(payload.triage)) {
+        const isFreshTriage = fetchStartGeneration === undefined || fetchStartGeneration === pollGeneration;
+        if (isFreshTriage && payload.triage && typeof payload.triage === "object" && !Array.isArray(payload.triage)) {
+          const nextConfirmed = Object.create(null);
           const nextTriage = Object.create(null);
           const tKeys = Object.keys(payload.triage);
           for (let i = 0; i < tKeys.length; i += 1) {
@@ -3983,10 +4315,11 @@
             if (!key) continue;
             const normalizedTriage = normalizeTriageEntry(payload.triage[tKeys[i]]);
             if (normalizedTriage) {
+              nextConfirmed[key] = normalizedTriage;
               nextTriage[key] = normalizedTriage;
             }
           }
-          // Keep optimistic entries for any job with an in-flight POST /api/triage request.
+          // Keep optimistic entries and confirmed rollback snapshots for any job with an in-flight POST /api/triage request.
           const pendingKeys = Object.keys(state.triagePending);
           for (let i = 0; i < pendingKeys.length; i += 1) {
             const pKey = pendingKeys[i];
@@ -3995,7 +4328,13 @@
             } else {
               delete nextTriage[pKey];
             }
+            if (Object.prototype.hasOwnProperty.call(state.confirmedTriage, pKey) && state.confirmedTriage[pKey]) {
+              nextConfirmed[pKey] = state.confirmedTriage[pKey];
+            } else {
+              delete nextConfirmed[pKey];
+            }
           }
+          state.confirmedTriage = nextConfirmed;
           state.triage = nextTriage;
         }
         renderProfile(payload.profile);
@@ -4017,6 +4356,7 @@
         const optionalNumber = value => Number.isFinite(value) && value >= 0 ? Math.floor(value) : null;
         state.searchTask = searchTask && typeof searchTask === "object" ? {
           status: asText(searchTask.status, "idle"),
+          source: asText(searchTask.source, "").toLowerCase(),
           completed: Math.max(0, Math.floor(Number(searchTask.completed) || 0)),
           total: Math.max(0, Math.floor(Number(searchTask.total) || 0)),
           new_jobs: Math.max(0, Math.floor(Number(searchTask.new_jobs) || 0)),
@@ -4042,13 +4382,21 @@
         state.lastError = null;
       }
 
-      function scheduleNextPoll() {
+      function clearPollTimer() {
         if (state.pollTimer !== null) {
           window.clearTimeout(state.pollTimer);
+          state.pollTimer = null;
         }
+      }
+
+      function scheduleNextPoll() {
+        clearPollTimer();
+        if (document.hidden) return;
         state.pollTimer = window.setTimeout(function () {
+          state.pollTimer = null;
+          if (document.hidden) return;
           fetchState();
-        }, POLL_INTERVAL_MS);
+        }, getPollIntervalMs());
       }
 
       async function fetchState(options) {
@@ -4063,6 +4411,7 @@
         state.isFetching = true;
         renderSyncHeader();
 
+        const fetchStartGeneration = pollGeneration;
         const runFetch = (async function () {
           try {
             const response = await fetch(API_URL, {
@@ -4074,7 +4423,7 @@
               throw new Error("Le serveur local a répondu avec le code HTTP " + response.status + ".");
             }
             const data = await response.json();
-            applyPayload(data);
+            applyPayload(data, fetchStartGeneration);
           } catch (err) {
             const reason = err && err.message ? err.message : "Connexion impossible.";
             state.lastError = "Impossible de récupérer l'état local (/api/state) : " + reason + " Nouvelle tentative automatique dans 5 s.";
@@ -4138,11 +4487,24 @@
       }
 
       // Event bindings
+      els.listContainer.addEventListener("click", function (event) {
+        const btn = event.target && typeof event.target.closest === "function"
+          ? event.target.closest(".job-item-btn")
+          : null;
+        if (!btn || !els.listContainer.contains(btn)) return;
+        const jobId = btn.dataset.jobId;
+        if (jobId) {
+          selectJob(jobId, true);
+        }
+      });
+
       els.refreshBtn.addEventListener("click", function () {
+        state.searchTaskError = null;
         fetchState({ force: true });
       });
 
       els.retryBtn.addEventListener("click", function () {
+        state.searchTaskError = null;
         fetchState({ force: true });
       });
 
@@ -4170,11 +4532,23 @@
       });
 
       els.searchInput.addEventListener("input", function (event) {
-        state.search = event.target.value;
-        renderAll();
+        const value = event.target.value;
+        els.clearSearchBtn.hidden = value.length === 0;
+        if (searchDebounceTimer !== null) {
+          window.clearTimeout(searchDebounceTimer);
+        }
+        searchDebounceTimer = window.setTimeout(function () {
+          searchDebounceTimer = null;
+          state.search = els.searchInput.value;
+          renderAll();
+        }, SEARCH_DEBOUNCE_MS);
       });
 
       els.clearSearchBtn.addEventListener("click", function () {
+        if (searchDebounceTimer !== null) {
+          window.clearTimeout(searchDebounceTimer);
+          searchDebounceTimer = null;
+        }
         state.search = "";
         els.searchInput.value = "";
         renderAll();
@@ -4287,8 +4661,22 @@
       els.resetFiltersBtn.addEventListener("click", resetFilters);
 
       document.addEventListener("keydown", function (event) {
-        if (event.key === "Escape" && state.mobileDetailOpen) {
-          closeMobileDetail();
+        if (event.key !== "Escape" || !state.mobileDetailOpen) return;
+        const target = event.target;
+        const tag = target && target.tagName ? target.tagName.toUpperCase() : "";
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        closeMobileDetail();
+      });
+
+      document.addEventListener("visibilitychange", function () {
+        if (document.hidden) {
+          clearPollTimer();
+          if (searchClock !== null) {
+            window.clearInterval(searchClock);
+            searchClock = null;
+          }
+        } else {
+          fetchState();
         }
       });
 

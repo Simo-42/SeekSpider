@@ -65,7 +65,29 @@ SKILL_PATTERNS = {
     "Agile / Scrum": r"\bagile\b|\bscrum\b",
     "C++": r"(?<![\w+])c\+\+(?![\w+])",
     "Git": r"\bgit\b",
+    "Azure DevOps": r"\bazure\s+devops\b",
+    "SQL / MSSQL": r"(?<!postgre)\b(?:ms)?sql\b|\bsql\s+server\b",
+    "Cisco": r"\bcisco\b",
+    "Hyper-V": r"\bhyper[- ]v\b",
+    "Veeam": r"\bveeam\b",
+    "SharePoint": r"\bsharepoint\b",
+    "Exchange": r"\bexchange\s+(?:online|server)\b|\bmicrosoft\s+exchange\b",
+    "Splunk": r"\bsplunk\b",
+    "AWS CDK": r"\baws\s+cdk\b|cloud development kit",
+    "FinOps": r"\bfinops\b",
+    "SSO / SAML / Okta": r"\bsso\b|\bsaml\b|\bokta\b",
+    "Salesforce": r"\bsalesforce\b",
+    "Adobe Experience": r"\badobe\s+experience\b",
+    "Snowflake": r"\bsnowflake\b",
+    "ConnectWise / HaloPSA": r"\bconnectwise\b|\bhalopsa\b",
 }
+
+TARGET_LOCATIONS = re.compile(
+    r"\b(?:sydney|melbourne|macquarie park|north sydney|parramatta|barangaroo|chatswood|"
+    r"surry hills|pyrmont|mascot|camberwell|richmond|hawthorn|southbank|essendon|"
+    r"docklands|cremorne|box hill|mulgrave|narre warren)\b",
+    re.I,
+)
 
 
 def profile_fingerprint(profile):
@@ -82,7 +104,10 @@ def profile_summary(profile):
         line = line.strip()
         if re.fullmatch(r"[A-Z][A-Z &/]{2,}", line):
             heading = line
-        elif line and not re.search(r"@|https?://|(?:\+?\d[ .()-]*){8,}", line, re.I):
+        elif line and not re.search(
+            r"@|https?://|\b(?:www\.|linkedin\.com|github\.com|gitlab\.com|t\.me|x\.com|twitter\.com)\S*|(?:\+?\d[ .()-]*){8,}",
+            line, re.I,
+        ):
             sections.setdefault(heading, []).append(line)
     return {
         "education": [line for line in sections.get("EDUCATION", [])
@@ -111,6 +136,10 @@ def skill_mentions(text):
             # A vendor-specific CI/CD entry should not also earn generic CI/CD points.
             if skill == "CI/CD" and re.search(r"\bgitlab\s+$", left, re.I):
                 continue
+            if skill == "Helm" and re.search(r"\b(?:tak(?:e|ing)|took|at)\s+the\s+$", left, re.I):
+                continue
+            if skill == "RDS" and re.search(r"\bremote\s+desktop(?:\s+services?)?\b", left + " " + right, re.I):
+                continue
             present.append(skill)
             break
     return present
@@ -128,8 +157,8 @@ def calculate_fit_score(job, description, profile):
     skills = set(skill_mentions(profile))
     matched = [skill for skill in requested if skill in skills]
     missing = [skill for skill in requested if skill not in skills]
-    # Score both coverage and depth so one shared keyword cannot max out the score.
-    skill_points = round(65 * (0.6 * len(matched) / len(requested) + 0.4 * min(len(matched) / 5, 1))) if requested else 0
+    # Score both coverage and depth; floor denominator at 3 to prevent 1/1 or 2/2 inflation.
+    skill_points = round(65 * (0.6 * len(matched) / max(len(requested), 3) + 0.4 * min(len(matched) / 5, 1))) if requested else 0
     years = max((years for years, _ in experience_mentions(description, required_only=True)), default=None)
     if years is None:
         experience_points, experience_reason = 4, "Minimum d’expérience non précisé clairement"
@@ -137,9 +166,9 @@ def calculate_fit_score(job, description, profile):
         experience_points, experience_reason = 10, f"Minimum repéré : {years:g} an(s), dans la cible de 0 à 3 ans"
     else:
         experience_points, experience_reason = 3, f"Minimum repéré : {years:g} ans, au-dessus de la cible"
-    area = (job.get("area") or "").lower()
+    area = job.get("area") or ""
     region = (job.get("region") or "").lower()
-    location_points = 5 if "sydney" in area or "melbourne" in area else (3 if "australia" in region else 0)
+    location_points = 5 if TARGET_LOCATIONS.search(area) else (3 if "australia" in region else 0)
     if matched:
         summary = f"L’annonce mentionne {len(matched)} compétence(s) présente(s) dans le CV."
     elif requested:

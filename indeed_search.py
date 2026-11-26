@@ -6,6 +6,11 @@ import re
 import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from urllib.parse import urlsplit
+
+from job_filters import normalized_dedup_key
+
+MAX_RUN_SECONDS = 340
 
 QUERIES = [
     "AWS Cloud Engineer",
@@ -51,9 +56,27 @@ def clean_str(value):
 
 
 def dedup_key(title, company):
-    norm = lambda s: re.sub(r"[^a-z0-9]+", " ", clean_str(s).lower()).strip()
-    t, c = norm(title), norm(company)
-    return (t, c) if t and c else None
+    return normalized_dedup_key(clean_str(title), clean_str(company))
+
+
+def _valid_indeed_url(url):
+    if not url or re.search(r"[\s<>]", url):
+        return False
+    parts = urlsplit(url)
+    if parts.scheme != "https" or not parts.netloc or "@" in parts.netloc or ":" in parts.netloc:
+        return False
+    host = (parts.hostname or "").lower()
+    return host == "indeed.com" or host.endswith(".indeed.com")
+
+
+def clean_markdown(text):
+    if not text:
+        return ""
+    text = re.sub(r"(?m)^\s*#{1,6}\s+", "", text)
+    text = re.sub(r"(?m)^\s*\*\s+", "", text)
+    text = re.sub(r"\*{2,}|_{2,}", "", text)
+    text = re.sub(r"(?<!\w)\*([^\n*]+)\*(?!\w)", r"\1", text)
+    return text.strip()
 
 
 def format_work_type(raw):
@@ -91,13 +114,13 @@ def normalize_row(row, query):
     raw_id = clean_str(row.get("id"))
     title = clean_str(row.get("title"))
     url = clean_str(row.get("job_url"))
-    if not raw_id or not title or not url:
+    if not raw_id or not title or not _valid_indeed_url(url):
         return None
     job_id = raw_id if raw_id.startswith("in-") else f"in-{raw_id}"
     posted = clean_str(row.get("date_posted"))
     if hasattr(row.get("date_posted"), "isoformat"):
         posted = row["date_posted"].isoformat()
-    desc = clean_str(row.get("description"))
+    desc = clean_markdown(clean_str(row.get("description")))
     return {
         "job_id": job_id,
         "source": "indeed",
@@ -142,6 +165,7 @@ class IndeedProgress:
         self.known_keys = set()
         self.discovered_jobs = 0
         self.recent_new_jobs = []
+        self.failed_queries = []
 
     def record_page(self, query, items):
         new_items = []
@@ -176,6 +200,7 @@ class IndeedProgress:
             "started_at": self.started_at, "updated_at": time.time(),
             "discovered_jobs": self.discovered_jobs, "last_query": self.last_query,
             "recent_new_jobs": self.recent_new_jobs,
+            "failed_queries": self.failed_queries,
         }, ensure_ascii=False), encoding="utf-8")
         temporary.replace(self.path)
 
@@ -227,6 +252,9 @@ def main():
             staged = Path(work) / "jobs.jsonl"
             with staged.open("w", encoding="utf-8") as feed:
                 for idx, query in enumerate(QUERIES):
+                    if time.time() - progress.started_at >= MAX_RUN_SECONDS:
+                        print(f"Budget temps Indeed AU atteint ({MAX_RUN_SECONDS}s) après {idx}/{len(QUERIES)} requêtes.", flush=True)
+                        break
                     items = []
                     try:
                         df = scrape_jobs(
@@ -245,6 +273,7 @@ def main():
                                 if item:
                                     items.append(item)
                     except Exception as exc:
+                        progress.failed_queries.append(query)
                         print(f"Indeed query failed ({query}): {exc}", flush=True)
                     new_items = progress.record_page(query, items)
                     for item in (new_items if args.merge else items):
